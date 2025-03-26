@@ -59,20 +59,24 @@ list_available_clients() {
 get_server_ip() {
     local server_ip
     
-    # Try to detect public IP using external services
-    echo "Attempting to detect your public IP address..."
+    # Try to detect public IPv4 address using external services
+    echo "Attempting to detect your public IPv4 address..."
     local public_ip=""
     
-    # Try multiple services in case one fails
+    # Try multiple services in case one fails, explicitly requesting IPv4
     if command -v curl &> /dev/null; then
-        public_ip=$(curl -s -4 ifconfig.co 2>/dev/null || curl -s -4 icanhazip.com 2>/dev/null || curl -s -4 ipinfo.io/ip 2>/dev/null)
+        public_ip=$(curl -s -4 https://api.ipify.org 2>/dev/null || 
+                   curl -s -4 https://ipv4.icanhazip.com 2>/dev/null || 
+                   curl -s -4 https://ipinfo.io/ip 2>/dev/null)
     elif command -v wget &> /dev/null; then
-        public_ip=$(wget -qO- ifconfig.co 2>/dev/null || wget -qO- icanhazip.com 2>/dev/null || wget -qO- ipinfo.io/ip 2>/dev/null)
+        public_ip=$(wget -qO- -4 https://api.ipify.org 2>/dev/null || 
+                   wget -qO- -4 https://ipv4.icanhazip.com 2>/dev/null || 
+                   wget -qO- -4 https://ipinfo.io/ip 2>/dev/null)
     fi
     
     # Try the local detection as fallback
     if [ -z "$public_ip" ] && [ -f "/etc/openvpn/server.conf" ]; then
-        public_ip=$(hostname -I | cut -d' ' -f1)
+        public_ip=$(hostname -I | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)
     fi
     
     if [ -n "$public_ip" ]; then
@@ -83,7 +87,7 @@ get_server_ip() {
             server_ip="$public_ip"
         fi
     else
-        echo "Could not automatically detect your public IP address."
+        echo "Could not automatically detect your public IPv4 address."
     fi
     
     # If not confirmed or found, ask user
@@ -108,7 +112,7 @@ get_server_port() {
         
         if [ -n "$detected_port" ]; then
             echo "Detected OpenVPN port: $detected_port"
-            read -p "Use this port? (y/n): " confirm
+            read -p "Use this port ($detected_port)? (y/n): " confirm
             
             if [[ $confirm =~ ^[Yy] ]]; then
                 server_port="$detected_port"
@@ -135,7 +139,7 @@ get_server_proto() {
         
         if [ -n "$detected_proto" ]; then
             echo "Detected OpenVPN protocol: $detected_proto"
-            read -p "Use this protocol? (y/n): " confirm
+            read -p "Use this protocol ($detected_proto)? (y/n): " confirm
             
             if [[ $confirm =~ ^[Yy] ]]; then
                 server_proto="$detected_proto"
