@@ -59,15 +59,31 @@ list_available_clients() {
 get_server_ip() {
     local server_ip
     
-    # Try to get server IP from existing configuration
-    if [ -f "/etc/openvpn/server.conf" ]; then
-        local public_ip=$(hostname -I | cut -d' ' -f1)
+    # Try to detect public IP using external services
+    echo "Attempting to detect your public IP address..."
+    local public_ip=""
+    
+    # Try multiple services in case one fails
+    if command -v curl &> /dev/null; then
+        public_ip=$(curl -s -4 ifconfig.co 2>/dev/null || curl -s -4 icanhazip.com 2>/dev/null || curl -s -4 ipinfo.io/ip 2>/dev/null)
+    elif command -v wget &> /dev/null; then
+        public_ip=$(wget -qO- ifconfig.co 2>/dev/null || wget -qO- icanhazip.com 2>/dev/null || wget -qO- ipinfo.io/ip 2>/dev/null)
+    fi
+    
+    # Try the local detection as fallback
+    if [ -z "$public_ip" ] && [ -f "/etc/openvpn/server.conf" ]; then
+        public_ip=$(hostname -I | cut -d' ' -f1)
+    fi
+    
+    if [ -n "$public_ip" ]; then
         echo "Detected server IP: $public_ip"
         read -p "Is this your server's public IP? (y/n): " confirm
         
         if [[ $confirm =~ ^[Yy] ]]; then
             server_ip="$public_ip"
         fi
+    else
+        echo "Could not automatically detect your public IP address."
     fi
     
     # If not confirmed or found, ask user
