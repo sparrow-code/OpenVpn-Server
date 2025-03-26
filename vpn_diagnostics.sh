@@ -35,6 +35,9 @@ detect_vpn_interface() {
     echo "$VPN_IF"
 }
 
+# Initialize variables to track issues
+ISSUES_FOUND=false
+
 # Detect external interface
 EXTERNAL_IF=$(detect_external_interface)
 if [ -z "$EXTERNAL_IF" ]; then
@@ -64,6 +67,7 @@ else
     echo "❌ OpenVPN service is NOT running."
     echo "   Try starting it with: sudo systemctl start openvpn@server"
     echo "   Or check logs with: sudo journalctl -u openvpn@server"
+    ISSUES_FOUND=true
     exit 1
 fi
 
@@ -76,6 +80,7 @@ else
     echo "   Enable it temporarily with: sudo sysctl -w net.ipv4.ip_forward=1"
     echo "   Enable it permanently by adding 'net.ipv4.ip_forward=1' to /etc/sysctl.conf"
     echo "   and running: sudo sysctl -p"
+    ISSUES_FOUND=true
     exit 1
 fi
 
@@ -89,6 +94,7 @@ else
     echo "❌ NAT rule for VPN traffic is missing."
     echo "   Add it using: sudo iptables -t nat -A POSTROUTING -o $EXTERNAL_IF -j MASQUERADE"
     NAT_MISSING=true
+    ISSUES_FOUND=true
 fi
 
 # Check forwarding rules
@@ -118,6 +124,7 @@ else
     
     echo "   These rules are needed to allow traffic forwarding between VPN clients and the internet."
     FIREWALL_MISSING=true
+    ISSUES_FOUND=true
 fi
 
 # 4. Check DNS resolution
@@ -127,6 +134,7 @@ if ping -c 1 8.8.8.8 &>/dev/null; then
 else
     echo "❌ Internet connectivity is NOT working."
     echo "   Check your server's internet connection with: ping 8.8.8.8"
+    ISSUES_FOUND=true
     exit 1
 fi
 
@@ -136,18 +144,33 @@ else
     echo "❌ DNS resolution is NOT working."
     echo "   Check your DNS configuration in /etc/resolv.conf"
     echo "   You might need to add 'push \"dhcp-option DNS 8.8.8.8\"' to your OpenVPN server config"
+    ISSUES_FOUND=true
     exit 1
 fi
 
 # 5. Test VPN client connectivity
 echo "Checking VPN tunnel..."
-VPN_IP=$(ip addr show dev $VPN_IF | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+VPN_IP=$(ip addr show dev $VPN_IF 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
 if [[ -n "$VPN_IP" ]]; then
     echo "✅ VPN tunnel is up with IP: $VPN_IP"
+    
+    # Check for connected clients
+    if [ -f /etc/openvpn/openvpn-status.log ]; then
+        CLIENT_COUNT=$(grep -c "^CLIENT_LIST" /etc/openvpn/openvpn-status.log)
+        if [ "$CLIENT_COUNT" -gt 0 ]; then
+            echo "✅ $CLIENT_COUNT clients currently connected"
+            echo "   Connected clients:"
+            grep "^CLIENT_LIST" /etc/openvpn/openvpn-status.log | awk '{print "   - " $2 " (" $3 ")" }'
+        else
+            echo "ℹ️ No clients currently connected to the VPN"
+        fi
+    else
+        echo "ℹ️ Cannot check client connections (status log not found)"
+    fi
 else
-    echo "❌ VPN tunnel is NOT up."
-    echo "   Check your OpenVPN configuration in /etc/openvpn/server.conf"
-    echo "   Look for errors in log: sudo journalctl -u openvpn@server"
+    echo "❌ VPN tunnel is NOT properly established."
+    echo "   Check OpenVPN server configuration and logs"
+    ISSUES_FOUND=true
     exit 1
 fi
 
@@ -163,6 +186,102 @@ else
         echo "   Check that your routing is correctly set up."
         echo "   Verify server.conf includes: push \"redirect-gateway def1 bypass-dhcp\""
     fi
+fi
+
+# Additional checks for OpenVPN configuration
+echo "Checking OpenVPN server configuration..."
+if [ -f /etc/openvpn/server.conf ]; then
+    echo "✅ OpenVPN server configuration file exists"
+    
+    # Check for essential configuration directives
+    CONFIG_ISSUES=()
+    
+    if ! grep -q "^dev tun" /etc/openvpn/server.conf; then
+        CONFIG_ISSUES+=("Missing or incorrect 'dev tun' directive")
+    fi
+    
+    if ! grep -q "^server [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}" /etc/openvpn/server.conf; then
+        CONFIG_ISSUES+=("Missing or incorrect 'server' directive (VPN subnet)")
+    fi
+    
+    if ! grep -q "redirect-gateway" /etc/openvpn/server.conf; then
+        CONFIG_ISSUES+=("Missing 'redirect-gateway' directive - clients may not route all traffic through VPN")
+    fi
+    
+    if ! grep -q "dhcp-option DNS" /etc/openvpn/server.conf; then
+        CONFIG_ISSUES+=("Missing DNS configuration - clients may have DNS resolution issues")
+    fi
+    
+    if [ ${#CONFIG_ISSUES[@]} -eq 0 ]; then
+        echo "✅ Server configuration appears to be valid"
+    else
+        echo "⚠️ Some potential issues with server configuration:"
+        for issue in "${CONFIG_ISSUES[@]}"; do
+            echo "   - $issue"
+        done
+        ISSUES_FOUND=true
+    fi
+else
+    echo "❌ OpenVPN server configuration file not found"
+    echo "   Expected location: /etc/openvpn/server.conf"
+    ISSUES_FOUND=true
+fi
+
+# Check for recent errors in logs
+echo "Checking OpenVPN logs for errors..."
+if [ -f /var/log/syslog ]; then
+    RECENT_ERRORS=$(grep -i "openvpn.*error" /var/log/syslog | tail -n 5)
+    if [ -n "$RECENT_ERRORS" ]; then
+        echo "⚠️ Recent errors found in OpenVPN logs:"
+        echo "$RECENT_ERRORS" | while read -r line; do
+            echo "   $line"
+        done
+        ISSUES_FOUND=true
+    else
+        echo "✅ No recent errors found in logs"
+    fi
+else
+    echo "ℹ️ Cannot check logs (syslog not found)"
+fi
+
+# Create auto-fix script if issues were found
+if $ISSUES_FOUND || [[ -n "$NAT_MISSING" ]] || [[ -n "$FIREWALL_MISSING" ]]; then
+    FIX_SCRIPT="/tmp/fix_vpn_issues.sh"
+    echo "#!/bin/bash" > $FIX_SCRIPT
+    echo "# Auto-generated script to fix VPN issues" >> $FIX_SCRIPT
+    echo "echo 'Fixing VPN configuration issues...'" >> $FIX_SCRIPT
+    
+    if [[ $(sysctl net.ipv4.ip_forward | awk '{print $3}') -ne 1 ]]; then
+        echo "echo 'Enabling IP forwarding...'" >> $FIX_SCRIPT
+        echo "sysctl -w net.ipv4.ip_forward=1" >> $FIX_SCRIPT
+        echo "echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf" >> $FIX_SCRIPT
+        echo "sysctl -p" >> $FIX_SCRIPT
+    fi
+    
+    if [[ -n "$NAT_MISSING" ]]; then
+        echo "echo 'Adding NAT rule...'" >> $FIX_SCRIPT
+        echo "iptables -t nat -A POSTROUTING -o $EXTERNAL_IF -j MASQUERADE" >> $FIX_SCRIPT
+    fi
+    
+    if ! $FORWARD_RULE1_OK; then
+        echo "echo 'Adding forwarding rule from VPN to internet...'" >> $FIX_SCRIPT
+        echo "iptables -A FORWARD -i $VPN_IF -o $EXTERNAL_IF -j ACCEPT" >> $FIX_SCRIPT
+    fi
+    
+    if ! $FORWARD_RULE2_OK; then
+        echo "echo 'Adding forwarding rule from internet to VPN...'" >> $FIX_SCRIPT
+        echo "iptables -A FORWARD -i $EXTERNAL_IF -o $VPN_IF -j ACCEPT" >> $FIX_SCRIPT
+    fi
+    
+    echo "echo 'To make these iptables rules permanent, run:'" >> $FIX_SCRIPT
+    echo "echo 'sudo apt install iptables-persistent && sudo netfilter-persistent save'" >> $FIX_SCRIPT
+    echo "echo 'All issues have been fixed!'" >> $FIX_SCRIPT
+    
+    chmod +x $FIX_SCRIPT
+    
+    echo
+    echo "📝 An automatic fix script has been created at $FIX_SCRIPT"
+    echo "   Run it with: sudo bash $FIX_SCRIPT"
 fi
 
 # Summary and recommendations
