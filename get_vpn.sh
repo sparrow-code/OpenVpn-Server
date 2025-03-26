@@ -3,9 +3,16 @@
 echo "=== OpenVPN Client Configuration Generator ==="
 echo "This script generates .ovpn configuration files for OpenVPN clients."
 
+# Get the real user's home directory even when run with sudo
+if [ -n "$SUDO_USER" ]; then
+    USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+else
+    USER_HOME="$HOME"
+fi
+
 # Default values
-CERT_DIR="$HOME"
-OUTPUT_DIR="$HOME/ovpn_configs"
+CERT_DIR="$USER_HOME/easy-rsa"
+OUTPUT_DIR="$USER_HOME/ovpn_configs"
 DEFAULT_PORT="1194"
 DEFAULT_PROTO="udp"
 
@@ -17,20 +24,21 @@ fi
 
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
+chown -R "$SUDO_USER":"$SUDO_USER" "$OUTPUT_DIR" 2>/dev/null || true
 
 # Function to list available client certificates
 list_available_clients() {
     echo "Available client certificates:"
     echo "-----------------------------"
     
-    if [ ! -d "$CERT_DIR/easy-rsa/pki/issued" ]; then
-        echo "No certificates found in $CERT_DIR/easy-rsa/pki/issued"
+    if [ ! -d "$CERT_DIR/pki/issued" ]; then
+        echo "No certificates found in $CERT_DIR/pki/issued"
         echo "Make sure you've set up OpenVPN and generated client certificates first."
         exit 1
     fi
     
     # List all non-server certificates
-    local clients=$(ls "$CERT_DIR/easy-rsa/pki/issued" | grep -v "server.crt" | sed 's/.crt$//')
+    local clients=$(ls "$CERT_DIR/pki/issued" | grep -v "server.crt" | sed 's/.crt$//')
     
     if [ -z "$clients" ]; then
         echo "No client certificates found."
@@ -138,18 +146,18 @@ generate_ovpn() {
     echo "Generating OVPN file for client: $client_name..."
     
     # Check if required files exist
-    if [ ! -f "$CERT_DIR/easy-rsa/pki/ca.crt" ]; then
-        echo "ERROR: CA certificate not found at $CERT_DIR/easy-rsa/pki/ca.crt"
+    if [ ! -f "$CERT_DIR/pki/ca.crt" ]; then
+        echo "ERROR: CA certificate not found at $CERT_DIR/pki/ca.crt"
         return 1
     fi
     
-    if [ ! -f "$CERT_DIR/easy-rsa/pki/issued/$client_name.crt" ]; then
-        echo "ERROR: Client certificate not found at $CERT_DIR/easy-rsa/pki/issued/$client_name.crt"
+    if [ ! -f "$CERT_DIR/pki/issued/$client_name.crt" ]; then
+        echo "ERROR: Client certificate not found at $CERT_DIR/pki/issued/$client_name.crt"
         return 1
     fi
     
-    if [ ! -f "$CERT_DIR/easy-rsa/pki/private/$client_name.key" ]; then
-        echo "ERROR: Client key not found at $CERT_DIR/easy-rsa/pki/private/$client_name.key"
+    if [ ! -f "$CERT_DIR/pki/private/$client_name.key" ]; then
+        echo "ERROR: Client key not found at $CERT_DIR/pki/private/$client_name.key"
         return 1
     fi
     
@@ -168,15 +176,18 @@ cipher AES-256-CBC
 verb 3
 
 <ca>
-$(cat "$CERT_DIR/easy-rsa/pki/ca.crt")
+$(cat "$CERT_DIR/pki/ca.crt")
 </ca>
 <cert>
-$(cat "$CERT_DIR/easy-rsa/pki/issued/$client_name.crt")
+$(cat "$CERT_DIR/pki/issued/$client_name.crt")
 </cert>
 <key>
-$(cat "$CERT_DIR/easy-rsa/pki/private/$client_name.key")
+$(cat "$CERT_DIR/pki/private/$client_name.key")
 </key>
 EOF
+    
+    # Ensure proper ownership of the generated file
+    chown "$SUDO_USER":"$SUDO_USER" "$OUTPUT_DIR/$client_name.ovpn" 2>/dev/null || true
     
     echo "Configuration file created: $OUTPUT_DIR/$client_name.ovpn"
     return 0
@@ -187,7 +198,7 @@ list_available_clients
 
 # Get client selection
 read -p "Enter the number of the client to generate config for: " selection
-clients=$(ls "$CERT_DIR/easy-rsa/pki/issued" | grep -v "server.crt" | sed 's/.crt$//')
+clients=$(ls "$CERT_DIR/pki/issued" | grep -v "server.crt" | sed 's/.crt$//')
 selected_client=$(echo "$clients" | sed -n "${selection}p")
 
 if [ -z "$selected_client" ]; then
