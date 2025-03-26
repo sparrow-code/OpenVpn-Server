@@ -60,7 +60,7 @@ get_server_ip() {
     local server_ip
     
     # Try to detect public IPv4 address using external services
-    echo "Attempting to detect your public IPv4 address..."
+    echo >&2 "Attempting to detect your public IPv4 address..."
     local public_ip=""
     
     # Try multiple services in case one fails, explicitly requesting IPv4
@@ -80,21 +80,21 @@ get_server_ip() {
     fi
     
     if [ -n "$public_ip" ]; then
-        echo "Detected server IP: $public_ip"
+        echo >&2 "Detected server IP: $public_ip"
         read -p "Is this your server's public IP? (y/n): " confirm
         
         if [[ $confirm =~ ^[Yy] ]]; then
             server_ip="$public_ip"
         fi
     else
-        echo "Could not automatically detect your public IPv4 address."
+        echo >&2 "Could not automatically detect your public IPv4 address."
     fi
     
     # If not confirmed or found, ask user
     if [ -z "$server_ip" ]; then
         read -p "Enter your OpenVPN server's public IP address: " server_ip
         while [ -z "$server_ip" ]; do
-            echo "Server IP cannot be empty."
+            echo >&2 "Server IP cannot be empty."
             read -p "Enter your OpenVPN server's public IP address: " server_ip
         done
     fi
@@ -111,7 +111,7 @@ get_server_port() {
         local detected_port=$(grep "^port " /etc/openvpn/server.conf | awk '{print $2}')
         
         if [ -n "$detected_port" ]; then
-            echo "Detected OpenVPN port: $detected_port"
+            echo >&2 "Detected OpenVPN port: $detected_port"
             read -p "Use this port ($detected_port)? (y/n): " confirm
             
             if [[ $confirm =~ ^[Yy] ]]; then
@@ -138,7 +138,7 @@ get_server_proto() {
         local detected_proto=$(grep "^proto " /etc/openvpn/server.conf | awk '{print $2}')
         
         if [ -n "$detected_proto" ]; then
-            echo "Detected OpenVPN protocol: $detected_proto"
+            echo >&2 "Detected OpenVPN protocol: $detected_proto"
             read -p "Use this protocol ($detected_proto)? (y/n): " confirm
             
             if [[ $confirm =~ ^[Yy] ]]; then
@@ -164,6 +164,7 @@ generate_ovpn() {
     local server_proto=$4
     
     echo "Generating OVPN file for client: $client_name..."
+    echo "Using: IP=$server_ip, PORT=$server_port, PROTOCOL=$server_proto"
     
     # Check if required files exist
     if [ ! -f "$CERT_DIR/pki/ca.crt" ]; then
