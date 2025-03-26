@@ -10,6 +10,7 @@ A comprehensive bash script collection for easy deployment and management of Ope
 - **Smart Detection**: Automatically detects existing installations and setup state
 - **Flexible Configuration**: Customizable subnet, port, and client settings
 - **Guided Process**: Interactive prompts guide you through the setup process
+- **OVPN File Generation**: Generate ready-to-use .ovpn configuration files for standard OpenVPN clients
 
 ## Prerequisites
 
@@ -27,9 +28,9 @@ A comprehensive bash script collection for easy deployment and management of Ope
    cd openvpn-routeros-setup
    ```
 
-2. Make the main script executable:
+2. Make the scripts executable:
    ```bash
-   chmod +x setupVpn.sh
+   chmod +x setupVpn.sh get_vpn.sh
    ```
 
 ## Usage
@@ -62,11 +63,27 @@ After initial setup, running the script again will enter client management mode 
 3. List all client certificates
 4. Exit the management interface
 
+### Generating OVPN Configuration Files
+
+For standard OpenVPN clients (not RouterOS), you can generate ready-to-use .ovpn configuration files:
+
+```bash
+sudo ./get_vpn.sh
+```
+
+The script will:
+
+1. List all available client certificates
+2. Let you select which client to create a configuration for
+3. Generate a complete .ovpn file with embedded certificates
+4. Save the file to `/home/itguy/vpn/ovpn_configs/` directory
+
 ## File Structure
 
 ```
 openvpn-routeros-setup/
 ├── setupVpn.sh            # Main script
+├── get_vpn.sh             # OVPN configuration generator
 ├── routerOs.sh            # RouterOS configuration guide
 ├── README.md              # This documentation
 └── functions/             # Module functions
@@ -104,6 +121,14 @@ After generating certificates, you'll need to:
 2. Import certificates in RouterOS and configure the OpenVPN client
 
 Detailed instructions are provided in `routerOs.sh`.
+
+## Standard OpenVPN Client Configuration
+
+For standard OpenVPN clients (Windows, Linux, Android, iOS, etc.):
+
+1. Generate the .ovpn file using `get_vpn.sh`
+2. Transfer the .ovpn file to your client device
+3. Import the .ovpn file into your OpenVPN client application
 
 ## Troubleshooting
 

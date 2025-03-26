@@ -4,8 +4,8 @@ echo "=== OpenVPN Client Configuration Generator ==="
 echo "This script generates .ovpn configuration files for OpenVPN clients."
 
 # Default values
-CERT_DIR="/home/itguy/vpn"
-OUTPUT_DIR="/home/itguy/vpn/ovpn_configs"
+CERT_DIR="$HOME"
+OUTPUT_DIR="$HOME/ovpn_configs"
 DEFAULT_PORT="1194"
 DEFAULT_PROTO="udp"
 
