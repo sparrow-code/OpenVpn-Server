@@ -1,6 +1,6 @@
 # OpenVPN API Routing Solution
 
-A specialized OpenVPN configuration that enables selective routing of API traffic through MikroTik routers using NAT-Based Transparent Proxy Routing.
+A specialized OpenVPN configuration that enables selective routing of API traffic through MikroTik routers using multiple proven techniques.
 
 ## Overview
 
@@ -9,18 +9,55 @@ This project provides scripts and configurations to route traffic for specific A
 Key features:
 
 - Traffic to specific API domains is routed through OpenVPN-connected MikroTik routers
-- Uses NAT-Based Transparent Proxy technique (more reliable than direct routing)
+- Multiple routing techniques to handle different network environments
 - Simple configuration and maintenance
 - Support for custom domains
 
-## NAT-Based Transparent Proxy Routing Technique
+## Available Routing Techniques
 
-This solution uses a specialized technique that avoids common routing issues:
+This solution offers three different routing methods to ensure compatibility with any environment:
 
-1. **No Gateway Issues**: Avoids the "Nexthop has invalid gateway" error by using NAT instead of direct routing
-2. **IP-Based Rules**: Uses IP addresses instead of domain names in routing rules
-3. **Transparent to Applications**: Applications don't need any special configuration
-4. **Resilient to IP Changes**: Can be easily updated when API IPs change
+### 1. NAT-Based Transparent Proxy (Default)
+
+```
+[Client] → [OpenVPN Server] → DNAT → [MikroTik Router] → [API Service]
+```
+
+Uses NAT rules to redirect traffic, avoiding common routing issues. This is our default approach as it's the most reliable across different environments.
+
+**Advantages:**
+
+- No "Nexthop has invalid gateway" errors
+- Works with complex firewall configurations
+- Simple to implement and maintain
+
+### 2. Direct TUN Bridging (Advanced)
+
+```
+[Client] → [OpenVPN Server] → [TUN Bridge] → [MikroTik Router] → [API Service]
+```
+
+For environments where NAT is problematic, this technique creates a direct Layer 2 bridge between the TUN interface and the MikroTik router.
+
+**Advantages:**
+
+- Lower latency than NAT
+- No connection tracking overhead
+- More transparent network path
+
+### 3. SOCKS Proxy Method (Fallback)
+
+```
+[Client] → [OpenVPN Server] → [Local SOCKS Proxy] → [MikroTik Router] → [API Service]
+```
+
+This method establishes a SOCKS proxy on the OpenVPN server that forwards connections through the MikroTik router.
+
+**Advantages:**
+
+- Works even with strict firewalls
+- No special routing required
+- Compatible with any client that supports SOCKS
 
 ## Directory Structure
 
@@ -42,7 +79,7 @@ apiRouting/
 - Linux server with OpenVPN server installed
 - MikroTik router with OpenVPN client capability
 
-### Setup Instructions
+### Basic Setup (NAT Method)
 
 1. Clone this repository:
 
@@ -51,7 +88,7 @@ apiRouting/
    cd openvpn-api-routing/apiRouting
    ```
 
-2. Run the NAT-based proxy routing script:
+2. Run the setup script with default NAT method:
 
    ```bash
    sudo bash nat-proxy-routing.sh
@@ -73,17 +110,42 @@ apiRouting/
    ./test-api-routing.sh
    ```
 
-### Adding Custom Domains
+### Advanced TUN Bridging Setup
 
-To route traffic for domains other than api.ipify.org:
+If the NAT method doesn't work in your environment, try the TUN bridging approach:
 
 ```bash
-sudo bash custom_domain_setup.sh your-custom-domain.com [port]
+sudo bash tun-bridge-routing.sh
+```
+
+Then follow the router configuration instructions displayed.
+
+### SOCKS Proxy Setup (Last Resort)
+
+If both previous methods fail:
+
+```bash
+sudo bash socks-proxy-routing.sh
 ```
 
 ## Troubleshooting
 
-See the troubleshooting.md file for common issues and solutions.
+See the troubleshooting.md file for common issues and solutions. If you're still having issues:
+
+1. Try the alternative routing methods described above
+2. Ensure your MikroTik router is properly connected to the VPN
+3. Check firewall rules on both server and router
+4. Verify the API IP hasn't changed (some APIs rotate IPs frequently)
+
+## Special Router Configurations
+
+For complex firewall setups on MikroTik routers, use our specialized configurations:
+
+```bash
+sudo bash generate-mikrotik-config.sh --firewall-compatible
+```
+
+This generates router commands that work alongside existing firewall rules.
 
 ## License
 

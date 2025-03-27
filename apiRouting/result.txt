@@ -1,58 +1,72 @@
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo bash cleanup.sh
-Removing unnecessary files...
-Fixing duplicate routing table entries...
-Routing tables fixed
-Cleanup complete
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo bash nat-proxy-routing.sh
-===== NAT-Based Transparent Proxy Routing Setup =====
-Date: Thu Mar 27 22:56:15 IST 2025
+-Server/apiRouting# sudo chmod +x enhanced-nat-routing.sh
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo ./enhanced-nat-routing.sh
+===== Enhanced API Routing Setup =====
+Date: Thu Mar 27 23:12:45 IST 2025
+Implementing dual-chain NAT with MikroTik integration
 Step 1: Setting up MikroTik connection...
 Testing connectivity...
 ✓ MikroTik router is reachable
-Step 2: Resolving API target...
+Step 2: Resolving API target with multiple DNS servers...
+Trying DNS server 8.8.8.8...
 ✓ api.ipify.org resolved to 104.26.12.205
-Step 3: Enabling IP forwarding...
+Step 3: Configuring network kernel parameters...
 net.ipv4.ip_forward = 1
-Step 4: Clearing existing NAT rules...
-Step 5: Setting up NAT-Based Transparent Proxy...
-✓ NAT-Based Transparent Proxy configured
-Step 6: Enabling proxy ARP...
-Enabled proxy_arp on tun0
-Step 7: Flushing routing cache...
+Enabled forwarding and proxy_arp on all
+Enabled forwarding and proxy_arp on default
+Enabled forwarding and proxy_arp on lo
+Enabled forwarding and proxy_arp on tun0
+Step 4: Setting up dedicated routing table...
+Step 5: Setting up enhanced routing...
+Error: Nexthop has invalid gateway.
+Step 6: Setting up enhanced NAT rules...
+✓ Enhanced NAT rules configured
+Step 7: Flushing caches...
 Step 8: Creating MikroTik configuration...
-✓ MikroTik configuration saved to mikrotik-router-commands.txt
+✓ Enhanced MikroTik configuration saved to mikrotik-enhanced-commands.rsc
 
-===== NAT-Based Transparent Proxy Routing Setup Complete =====
+===== Enhanced Setup Complete =====
 
-IMPORTANT STEPS TO MAKE IT WORK:
+IMPORTANT: Follow these steps exactly to make it work:
 
-1. Copy and paste each MikroTik command ONE BY ONE:
-   - Open the file: mikrotik-router-commands.txt
-   - Copy and paste each command SEPARATELY into your MikroTik terminal
+1. Apply the MikroTik commands one by one from mikrotik-enhanced-commands.rsc
+   IMPORTANT: Each command must be applied separately to avoid syntax errors
 
-2. Restart OpenVPN service:
+2. Restart OpenVPN and networking on the server:
    sudo systemctl restart openvpn
+   sudo systemctl restart networking
 
-3. Test if it's working:
-   ./test-api-routing.sh
+3. Run the enhanced test script to verify the setup:
+   ./enhanced-test-api-routing.sh
 
-If it still shows the VPN server's IP (176.222.55.126),
-make sure you've correctly entered ALL MikroTik commands.
+If it's still showing the VPN server IP, check:
+1. MikroTik connection status (ping 10.8.0.6)
+2. MikroTik firewall rules that might be blocking traffic
+3. Run 'ip route get 104.26.12.205' to see the actual route being used
 
-This NAT-Based Transparent Proxy Routing technique bypasses
-the 'Nexthop has invalid gateway' error by using NAT instead of routing.
-
+Logs are stored in /var/log/api_routing for later investigation
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ip route get 104.26.12.205
+104.26.12.205 via 176.222.55.1 dev ens1 src 176.222.55.126 uid 0
+    cache
 root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#  sudo systemctl restart openvpn
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ./test-api-routing.shsudo systemctl restart openvpn^C
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ^C
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo systemctl restart openvpn
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ./test-api-routing.sh
-===== Testing API Routing =====
-Making 5 requests to http://api.ipify.org?format=json
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#  sudo systemctl restart networking
+Failed to restart networking.service: Unit networking.service not found.
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ./enhanced-test-api-routing.sh
+===== Enhanced API Routing Test =====
+Date: Thu Mar 27 23:14:25 IST 2025
+Testing 10 requests to http://api.ipify.org?format=json
+------------------------------------------
+VPN Server IP: 176.222.55.126
+DNS Resolution: 104.26.12.205
+NAT Rules for API IP: 3
 
-Request 1: {"ip":"176.222.55.126"}
-Request 2: {"ip":"176.222.55.126"}
-Request 3: {"ip":"176.222.55.126"}
-Request 4: {"ip":"176.222.55.126"}
-Request 5: {"ip":"176.222.55.126"}
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
+[CURL] Making 10 API requests:
+Request 1:
+176.222.55.126
+Request 2: 176.222.55.126
+Request 3: 176.222.55.126
+Request 4: 176.222.55.126
+Request 5: 176.222.55.126
+Request 6: 176.222.55.126
+Request 7: 176.222.55.126
+Request 8: 176.222.55.126
+Request 9: 176.222.55.126
