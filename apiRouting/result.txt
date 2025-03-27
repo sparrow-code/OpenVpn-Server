@@ -1,0 +1,10 @@
+cat /etc/openvpn/active_routers
+cat: /etc/openvpn/active_routers: No such file or directory
+root@itguy-Zeroxbit:~# ip route show table apiroutes
+Error: ipv4: FIB table does not exist.
+Dump terminated
+root@itguy-Zeroxbit:~# ip rule show | grep api
+root@itguy-Zeroxbit:~# ip route get $(host -t A api.ipify.org | grep "has address" | head -n1 | awk '{print $NF}')
+104.26.12.205 via 176.222.55.1 dev ens1 src 176.222.55.126 uid 0
+    cache
+root@itguy-Zeroxbit:~#
