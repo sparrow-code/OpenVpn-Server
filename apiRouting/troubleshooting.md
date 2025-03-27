@@ -77,6 +77,25 @@ ip route add $API_IP/32 via 10.8.0.6 table apiroutes
 ip route flush cache
 ```
 
-### 5. MikroTik Router Configuration Issues
+### 5. "Nexthop has invalid gateway" Error
 
-Make sure your MikroTik is properly configured:
+This error occurs when Linux cannot use the MikroTik VPN IP as a gateway. To fix this:
+
+```bash
+# Use the NAT approach instead of direct routing
+iptables -t nat -F PREROUTING
+iptables -t nat -F POSTROUTING
+
+# Get API IP
+API_IP=$(host -t A api.ipify.org | grep "has address" | head -n1 | awk '{print $NF}')
+MIKROTIK_VPN_IP="10.8.0.6"
+VPN_SERVER_INTERNAL_IP="10.8.0.1"
+
+# Add NAT rules
+iptables -t nat -A PREROUTING -d $API_IP -j DNAT --to-destination $MIKROTIK_VPN_IP
+iptables -t nat -A POSTROUTING -d $MIKROTIK_VPN_IP -j SNAT --to-source $VPN_SERVER_INTERNAL_IP
+```
+
+### 6. MikroTik Router Configuration Issues
+
+The most common error is incorrect command syntax on MikroTik. Use these exact commands:

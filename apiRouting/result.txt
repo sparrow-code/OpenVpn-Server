@@ -1,203 +1,151 @@
-/apiRouting# sudo bash diagnostics.sh > gateway_diagnostics.log
+g# bash ./fix-routing-errors.sh
+===== API Routing Error Fix Script =====
+This script will fix critical errors in your API routing setup
+Date: Thu Mar 27 20:10:59 IST 2025
+
+Using API target: api.ipify.org
+Resolving api.ipify.org...
+✓ api.ipify.org resolved to 104.26.12.205
+Checking active_routers file...
+✓ Found MikroTik IP in active_routers: 10.8.0.6
+Testing connectivity to MikroTik router (10.8.0.6)...
+✓ MikroTik router is reachable
+Setting up routing table...
+✓ Routing table 'apiroutes' exists
+Setting up IP-based routing rules (fixing the domain name error)...
+Removing rule: 32765:   from all to 172.67.74.152 lookup apiroutes
+Adding rule for 104.26.12.205...
+✓ IP-based rule added
+Adding explicit route to the routing table...
+Error: Nexthop has invalid gateway.
+WARNING: Could not add route via MikroTik IP
+Using direct static route instead
+✓ Route added to table
+Setting up NAT configuration...
+Clearing existing NAT rules...
+✓ NAT rules configured
+Flushing routing cache...
+✓ Routing cache flushed
+Creating diagnostic script...
+✓ Diagnostic script created at /home/itguy/vpn/OpenVpn-Server/apiRouting/api-routing-diagnostics.sh
+Setting up alternative approach using DNAT/SNAT...
+✓ Alternative routing approach configured
+✓ Test script created at /home/itguy/vpn/OpenVpn-Server/apiRouting/test-api-connection.sh
+✓ MikroTik config generator created at /home/itguy/vpn/OpenVpn-Server/apiRouting/generate-mikrotik-config.sh
+✓ MikroTik configuration generated: mikrotik-config-api.ipify.org.rsc
+✓ Quick fix script created at /home/itguy/vpn/OpenVpn-Server/apiRouting/quick-fix.sh
+
+===== Error Fix Complete =====
+
+All detected issues have been fixed. To verify:
+
+1. Run the test script:
+   /home/itguy/vpn/OpenVpn-Server/apiRouting/test-api-connection.sh
+
+2. If issues persist, run the diagnostics:
+   /home/itguy/vpn/OpenVpn-Server/apiRouting/api-routing-diagnostics.sh
+
+3. Apply the MikroTik configuration found in /home/itguy/vpn/OpenVpn-Server/apiRouting/mikrotik-config-api.ipify.org.rsc
+
+Quick fix available if issues return:
+   /home/itguy/vpn/OpenVpn-Server/apiRouting/quick-fix.sh
+
+Important: If the MikroTik router isn't actually connected to the OpenVPN server,
+          you'll need to establish that connection first.
+
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo bash verify_routing.sh
+===== Verifying API Routing =====
+API Target: api.ipify.org (104.26.13.205)
+
+Test 1: Checking NAT configuration...
+✗ NAT rules not found for 104.26.13.205
+
+Test 2: Testing direct connectivity...
+curl http://api.ipify.org?format=json
 ^C
 root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ^C
 root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ^C
 root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ^C
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo bash gateway-fix.sh
-===== Gateway Fix Script =====
-This script specifically fixes the 'Nexthop has invalid gateway' error
-Date: Thu Mar 27 20:02:05 IST 2025
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# curl http://api.ipify.org?format=json
+{"ip":"176.222.55.126"}root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo bash fix-api-routing.sh
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo bash fix-api-routing.sh
+===== API Routing Fix =====
+Making API traffic go through MikroTik public IP
+Date: Thu Mar 27 20:14:17 IST 2025
 
-Found MikroTik VPN IP: 10.8.0.6
-Resolving api.ipify.org...
-api.ipify.org resolved to 104.26.13.205
-Enabling IP forwarding system-wide...
+Step 1: Resolving API target...
+api.ipify.org resolves to 104.26.12.205
+Step 2: Setting up active_routers file...
+MikroTik VPN IP set to: 10.8.0.6
+Step 3: Enabling IP forwarding...
 net.ipv4.ip_forward = 1
-* Applying /etc/sysctl.d/10-console-messages.conf ...
-kernel.printk = 4 4 1 7
-* Applying /etc/sysctl.d/10-ipv6-privacy.conf ...
-net.ipv6.conf.all.use_tempaddr = 2
-net.ipv6.conf.default.use_tempaddr = 2
-* Applying /etc/sysctl.d/10-kernel-hardening.conf ...
-kernel.kptr_restrict = 1
-* Applying /etc/sysctl.d/10-magic-sysrq.conf ...
-kernel.sysrq = 176
-* Applying /etc/sysctl.d/10-network-security.conf ...
-net.ipv4.conf.default.rp_filter = 2
-net.ipv4.conf.all.rp_filter = 2
-* Applying /etc/sysctl.d/10-ptrace.conf ...
-kernel.yama.ptrace_scope = 1
-* Applying /etc/sysctl.d/10-zeropage.conf ...
-vm.mmap_min_addr = 65536
-* Applying /usr/lib/sysctl.d/50-default.conf ...
-kernel.core_uses_pid = 1
-net.ipv4.conf.default.rp_filter = 2
-net.ipv4.conf.default.accept_source_route = 0
-sysctl: setting key "net.ipv4.conf.all.accept_source_route": Invalid argument
-net.ipv4.conf.default.promote_secondaries = 1
-sysctl: setting key "net.ipv4.conf.all.promote_secondaries": Invalid argument
-net.ipv4.ping_group_range = 0 2147483647
-net.core.default_qdisc = fq_codel
-fs.protected_hardlinks = 1
-fs.protected_symlinks = 1
-fs.protected_regular = 1
-fs.protected_fifos = 1
-* Applying /usr/lib/sysctl.d/50-pid-max.conf ...
-kernel.pid_max = 4194304
-* Applying /etc/sysctl.d/99-ip-forward.conf ...
-net.ipv4.ip_forward = 1
-* Applying /usr/lib/sysctl.d/99-protect-links.conf ...
-fs.protected_fifos = 1
-fs.protected_hardlinks = 1
-fs.protected_regular = 2
-fs.protected_symlinks = 1
-* Applying /etc/sysctl.d/99-sysctl.conf ...
-net.ipv4.ip_forward = 1
-* Applying /etc/sysctl.conf ...
-net.ipv4.ip_forward = 1
-✓ IP forwarding enabled
-Approach 1: Testing alternative route syntax...
-Standard routing failed, trying alternative approaches.
-Approach 2: Setting up enhanced NAT routing...
-Clearing existing NAT rules...
-Adding DNAT/SNAT rules for API traffic...
-✓ NAT rules configured
-Approach 3: Setting up proxy_arp to help with routing...
+IP forwarding enabled
+Step 4: Setting up routing table...
+Step 5: Cleaning up previous routing configuration...
+Step 6: Setting up IP-based routing...
+Error: Nexthop has invalid gateway.
+Routing configured
+Step 7: Setting up proper NAT rules...
+Adding essential NAT rules...
+NAT rules applied
+Step 8: Enabling proxy ARP...
 Enabled proxy_arp on tun0
-✓ Proxy ARP configured
-Approach 4: Setting up direct device route...
-Warning: Could not determine TUN interface
-Approach 5: Setting up policy based routing...
-✓ Added policy rule for 104.26.13.205
-✓ Created verification script: verify_routing.sh
-✓ Created MikroTik configuration: mikrotik_gateway_fix.rsc
+Step 9: Applying changes...
+Routing cache flushed
+Creating MikroTik configuration...
 
-===== Gateway Fix Complete =====
+===== Fix Complete =====
 
-The gateway error should be fixed using multiple approaches.
+To test if the fix worked:
+  curl http://api.ipify.org?format=json
 
-Verification steps:
-1. Run the verification script: ./verify_routing.sh
-2. Apply the MikroTik configuration: mikrotik_gateway_fix.rsc
-3. Final test: curl http://api.ipify.org?format=json
+If you're still seeing the VPN server's IP (176.222.55.126):
+1. Apply the MikroTik configuration from mikrotik-fix.rsc to your router
+2. Restart OpenVPN: systemctl restart openvpn
+3. Try again: curl http://api.ipify.org?format=json
 
-If still not working, try rebooting both the VPN server and the MikroTik router.
-
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo bash diagnostics.sh > gateway_diagnostics.log
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo bash gateway-fix.sh
-===== Gateway Fix Script =====
-This script specifically fixes the 'Nexthop has invalid gateway' error
-Date: Thu Mar 27 20:02:55 IST 2025
-
-Found MikroTik VPN IP: 10.8.0.6
-Resolving api.ipify.org...
-api.ipify.org resolved to 104.26.12.205
-Enabling IP forwarding system-wide...
-net.ipv4.ip_forward = 1
-* Applying /etc/sysctl.d/10-console-messages.conf ...
-kernel.printk = 4 4 1 7
-* Applying /etc/sysctl.d/10-ipv6-privacy.conf ...
-net.ipv6.conf.all.use_tempaddr = 2
-net.ipv6.conf.default.use_tempaddr = 2
-* Applying /etc/sysctl.d/10-kernel-hardening.conf ...
-kernel.kptr_restrict = 1
-* Applying /etc/sysctl.d/10-magic-sysrq.conf ...
-kernel.sysrq = 176
-* Applying /etc/sysctl.d/10-network-security.conf ...
-net.ipv4.conf.default.rp_filter = 2
-net.ipv4.conf.all.rp_filter = 2
-* Applying /etc/sysctl.d/10-ptrace.conf ...
-kernel.yama.ptrace_scope = 1
-* Applying /etc/sysctl.d/10-zeropage.conf ...
-vm.mmap_min_addr = 65536
-* Applying /usr/lib/sysctl.d/50-default.conf ...
-kernel.core_uses_pid = 1
-net.ipv4.conf.default.rp_filter = 2
-net.ipv4.conf.default.accept_source_route = 0
-sysctl: setting key "net.ipv4.conf.all.accept_source_route": Invalid argument
-net.ipv4.conf.default.promote_secondaries = 1
-sysctl: setting key "net.ipv4.conf.all.promote_secondaries": Invalid argument
-net.ipv4.ping_group_range = 0 2147483647
-net.core.default_qdisc = fq_codel
-fs.protected_hardlinks = 1
-fs.protected_symlinks = 1
-fs.protected_regular = 1
-fs.protected_fifos = 1
-* Applying /usr/lib/sysctl.d/50-pid-max.conf ...
-kernel.pid_max = 4194304
-* Applying /etc/sysctl.d/99-ip-forward.conf ...
-net.ipv4.ip_forward = 1
-* Applying /usr/lib/sysctl.d/99-protect-links.conf ...
-fs.protected_fifos = 1
-fs.protected_hardlinks = 1
-fs.protected_regular = 2
-fs.protected_symlinks = 1
-* Applying /etc/sysctl.d/99-sysctl.conf ...
-net.ipv4.ip_forward = 1
-* Applying /etc/sysctl.conf ...
-net.ipv4.ip_forward = 1
-✓ IP forwarding enabled
-Approach 1: Testing alternative route syntax...
-Standard routing failed, trying alternative approaches.
-Approach 2: Setting up enhanced NAT routing...
-Clearing existing NAT rules...
-Adding DNAT/SNAT rules for API traffic...
-✓ NAT rules configured
-Approach 3: Setting up proxy_arp to help with routing...
-Enabled proxy_arp on tun0
-✓ Proxy ARP configured
-Approach 4: Setting up direct device route...
-Warning: Could not determine TUN interface
-Approach 5: Setting up policy based routing...
-✓ Added policy rule for 104.26.12.205
-✓ Created verification script: verify_routing.sh
-✓ Created MikroTik configuration: mikrotik_gateway_fix.rsc
-
-===== Gateway Fix Complete =====
-
-The gateway error should be fixed using multiple approaches.
-
-Verification steps:
-1. Run the verification script: ./verify_routing.sh
-2. Apply the MikroTik configuration: mikrotik_gateway_fix.rsc
-3. Final test: curl http://api.ipify.org?format=json
-
-If still not working, try rebooting both the VPN server and the MikroTik router.
-
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo bash verify_routing.sh
-===== Verifying API Routing =====
-API Target: api.ipify.org (172.67.74.152)
-
-Test 1: Checking NAT configuration...
-✗ NAT rules not found for 172.67.74.152
-
-Test 2: Testing direct connectivity...
-{"ip":"176.222.55.126"}
-
-Test 3: Running verbose test...
-* Connected to api.ipify.org (172.67.74.152) port 80 (#0)
-> GET / HTTP/1.1
-< HTTP/1.1 200 OK
-
-===== Verification Complete =====
-If you see your MikroTik's public IP in the response, the fix worked!
-If not, apply the MikroTik configuration and try again.
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
+Your traffic should now go through your MikroTik's public IP.
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ls
+README.md                   custom_domain_setup.sh  gateway_diagnostics.log            mikrotik_gateway_fix.rsc   troubleshooting.md
+api-routing-diagnostics.sh  diagnostics.sh          generate-mikrotik-config.sh        quick-fix.sh               verify-routing.js
+api-routing-fix.sh          fix-api-routing.sh      mikrotik-config-api.ipify.org.rsc  result.txt                 verify_routing.sh
+api_routing_setup.sh        fix-routing-errors.sh   mikrotik-fix.rsc                   setup-mikrotik-routing.sh
+client_configs_guide.md     gateway-fix.sh          mikrotik_config.txt                test-api-connection.sh
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo systemctl restart openvpn
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# curl http://api.ipify.org?format=json
+{"ip":"176.222.55.126"}root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
 
 
-and after setup mikrotik_gateway_fix.rsc file
 
- /usr/local/bin/test-api-routing.sh 3
-Testing API routing with 3 requests...
-Date: Thu Mar 27 20:07:15 IST 2025
-Request 1: 176.222.55.126
-Request 2: 176.222.55.126
-Request 3: 176.222.55.126
+still same error
 
-Summary:
-Total requests: 3
-Unique IPs: 1
-IP distribution:
-176.222.55.126: 3 requests
-
-i have got this in logs
+[admin@MikroTik] /interface list member> add interface=ovpn-out1 list=VPN
+[admin@MikroTik] /interface list member> /
+[admin@MikroTik] > /interface ovpn-client
+[admin@MikroTik] /interface ovpn-client> set [find] add-default-route=no connect-to=176.222.55.126 use-encryption=yes
+expected end of command (line 1 column 59)
+[admin@MikroTik] /interface ovpn-client> /
+[admin@MikroTik] > /interface ovpn-client
+[admin@MikroTik] /interface ovpn-client> set [find] add-default-route=no connect-to=176.222.55.126 use-encryption=yes
+expected end of command (line 1 column 59)
+[admin@MikroTik] /interface ovpn-client> 
+[admin@MikroTik] /interface ovpn-client> 
+[admin@MikroTik] /interface ovpn-client> set [find] add-default-route=no connect-to=176.222.55.126 
+[admin@MikroTik] /interface ovpn-client> /ip forward set enabled=yes
+bad command name forward (line 1 column 5)
+[admin@MikroTik] /interface ovpn-client> /
+[admin@MikroTik] > /ip forward set enabled=yes
+bad command name forward (line 1 column 5)
+[admin@MikroTik] > /ip route add dst-address=104.26.12.205/32 gateway=10.8.0.1 distance=1
+[admin@MikroTik] > /ip firewall nat add chain=srcnat src-address=10.8.0.1 dst-address=104.26.12.205 action=masquerade comment="NAT for API traffic"
+[admin@MikroTik] > /ip dns static add name=api.ipify.org address=104.26.12.205
+failure: entry already exists
+[admin@MikroTik] > 
