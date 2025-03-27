@@ -1,27 +1,60 @@
-# API Routing Troubleshooting Guide
+# Enhanced API Routing Troubleshooting Guide
 
-This guide provides solutions for the most common issues with the API routing solution.
+## Comprehensive Diagnosis Steps
 
-## NAT-Based Transparent Proxy Routing Technique
+### 1. Verify MikroTik Connectivity
 
-This solution uses NAT rules instead of direct routing to avoid the "Nexthop has invalid gateway" error.
-
-### How It Works
-
-1. Traffic to API IP is DNATed to MikroTik router
-2. Return traffic is SNATed to VPN server internal IP
-3. MikroTik processes traffic through its public interface
-4. No direct routing is used, avoiding gateway issues
-
-## Common Issues
-
-### 1. "Nexthop has invalid gateway" Error
-
-This happens when you try to use direct routing. Fix by using NAT-based transparent proxying instead:
+First, ensure your MikroTik router is properly connected:
 
 ```bash
-# Get API IP
-API_IP=$(host -t A api.ipify.org | grep "has address" | head -n1 | awk '{print $NF}')
+# Check if MikroTik is connected to VPN and responsive
+ping -c 3 10.8.0.6
+cat /etc/openvpn/active_routers
+```
+
+### 2. Check Routing Configuration
+
+Verify the routing tables and rules are properly set up:
+
+```bash
+# Get current API IP
+API_IP=$(dig +short api.ipify.org)
+echo "API IP: $API_IP"
+
+# Check routing table
+ip route show table apiroutes
+
+# Check routing rules
+ip rule show | grep -E "(api|$API_IP)"
+
+# See what route will actually be used
+ip route get $API_IP
+```
+
+### 3. Verify NAT Rules
+
+Ensure your NAT rules are correctly set up:
+
+```bash
+# Check PREROUTING chain
+iptables -t nat -L PREROUTING -v -n
+# Should show DNAT rule for API IP to MikroTik
+
+# Check POSTROUTING chain
+iptables -t nat -L POSTROUTING -v -n
+# Should show SNAT rule for MikroTik
+```
+
+### 4. Common Issues and Solutions
+
+#### Traffic Still Using VPN Server IP
+
+If requests still show the VPN server's IP (176.222.55.126):
+
+1. **Comprehensive NAT Rules Fix**:
+
+```bash
+API_IP=$(dig +short api.ipify.org)
 MIKROTIK_VPN_IP="10.8.0.6"
 VPN_SERVER_INTERNAL_IP="10.8.0.1"
 
@@ -29,69 +62,105 @@ VPN_SERVER_INTERNAL_IP="10.8.0.1"
 iptables -t nat -F PREROUTING
 iptables -t nat -F POSTROUTING
 
-# Set up NAT-based transparent proxying
+# Add proper NAT rules
 iptables -t nat -A PREROUTING -d $API_IP -j DNAT --to-destination $MIKROTIK_VPN_IP
 iptables -t nat -A POSTROUTING -d $MIKROTIK_VPN_IP -j SNAT --to-source $VPN_SERVER_INTERNAL_IP
+iptables -t nat -A PREROUTING -p tcp --dport 80 -d $API_IP -j DNAT --to-destination $MIKROTIK_VPN_IP:80
+iptables -t nat -A PREROUTING -p tcp --dport 443 -d $API_IP -j DNAT --to-destination $MIKROTIK_VPN_IP:443
+
+# Clean conntrack table
+conntrack -F 2>/dev/null || echo "conntrack not available"
 ```
 
-### 2. MikroTik Command Syntax Errors
+2. **Check MikroTik Configuration**:
 
-The MikroTik router requires specific command syntax. Use these exact commands:
+Connect to your MikroTik router and verify:
 
 ```
-# This works - Enable IP forwarding
-/ip forward set enabled=yes
+/ip route print where comment~"API"
+/ip firewall nat print where comment~"API"
+/ip dns static print where comment~"API"
+```
 
-# This works - Add route
+3. **Restart Services**:
+
+```bash
+sudo systemctl restart openvpn
+sudo systemctl restart networking
+```
+
+#### MikroTik Command Errors
+
+When entering commands on the MikroTik router:
+
+1. Use these exact commands one at a time:
+
+```
+# First enable IP forwarding
+/ip settings set ip-forward=yes
+
+# Then add the route (use correct IP!)
 /ip route add dst-address=104.26.12.205/32 gateway=10.8.0.1 distance=1
 
-# This works - Add NAT rule
+# Then add NAT rule
 /ip firewall nat add chain=srcnat src-address=10.8.0.1 dst-address=104.26.12.205 action=masquerade
 ```
 
-### 3. Domain-Based Routing Not Working
+2. If you see "bad command name" errors, check your RouterOS version. These commands work on RouterOS v6 and v7.
 
-Linux IP rules don't support domain names directly. Always use IP addresses:
+#### API IP Address Changes Frequently
 
-```bash
-# This fails
-ip rule add to api.ipify.org lookup apiroutes  # Error!
+If the API IP changes often:
 
-# This works
-API_IP=$(host -t A api.ipify.org | grep "has address" | head -n1 | awk '{print $NF}')
-ip rule add to $API_IP lookup apiroutes
+1. Use the address list feature on MikroTik:
+
+```
+/ip firewall address-list add address=104.26.12.205 list=api_targets
+/ip firewall address-list add address=104.26.13.205 list=api_targets
+/ip firewall nat add chain=srcnat src-address=10.8.0.1 dst-address-list=api_targets action=masquerade
 ```
 
-### 4. API IP Address Changes
+2. Use our automatic update script included in the MikroTik configuration.
 
-API services like api.ipify.org use multiple IPs. Use this script to update your configuration when the IP changes:
+#### Firewall Interference
 
-```bash
-#!/bin/bash
-API_TARGET="api.ipify.org"
-OLD_IP=$(grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' /path/to/your/config)
-NEW_IP=$(host -t A $API_TARGET | grep "has address" | head -n1 | awk '{print $NF}')
+If your existing firewall rules are interfering:
 
-if [ "$OLD_IP" != "$NEW_IP" ]; then
-    echo "IP changed from $OLD_IP to $NEW_IP, updating..."
-    # Update NAT rules
-    iptables -t nat -F PREROUTING
-    iptables -t nat -F POSTROUTING
-    iptables -t nat -A PREROUTING -d $NEW_IP -j DNAT --to-destination 10.8.0.6
-    iptables -t nat -A POSTROUTING -d 10.8.0.6 -j SNAT --to-source 10.8.0.1
-fi
+1. Ensure the new NAT rule is placed at the beginning of your NAT chain:
+
+```
+/ip firewall nat add chain=srcnat src-address=10.8.0.1 dst-address=104.26.12.205 action=masquerade place-before=0
 ```
 
-### 5. Testing Your Setup
+2. Add a dedicated accept rule for API traffic if needed:
 
-Run this simple test to verify if your setup is working:
-
-```bash
-# Simple test
-curl http://api.ipify.org?format=json
-
-# Multiple requests test
-for i in {1..5}; do curl -s http://api.ipify.org?format=json; echo; sleep 1; done
+```
+/ip firewall filter add chain=forward src-address=10.8.0.1 dst-address-list=api_targets action=accept place-before=0
 ```
 
-If the IP shown is your MikroTik's public IP, the setup is working correctly. If it shows 176.222.55.126, it's still using your VPN server's IP.
+### 5. Advanced Diagnostics
+
+For deeper diagnosis:
+
+```bash
+# Check routing cache
+ip route show cache
+
+# Watch traffic in real-time
+sudo tcpdump -i tun0 host api.ipify.org -n
+
+# Test with multiple methods
+curl -v http://api.ipify.org
+wget -O- http://api.ipify.org
+python3 -c "import urllib.request; print(urllib.request.urlopen('http://api.ipify.org').read().decode())"
+```
+
+### 6. Understanding the NAT-Based Transparent Proxy Technique
+
+Our technique uses a combination of special NAT rules:
+
+1. **DNAT** - Redirects traffic to API to go to the MikroTik router
+2. **SNAT** - Makes redirected traffic appear to come from the VPN server
+3. **Connection Tracking** - Ensures return traffic is properly routed
+
+Unlike direct routing, this approach avoids "Nexthop has invalid gateway" errors and works even with complex firewall setups.
