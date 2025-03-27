@@ -1,10 +1,31 @@
-cat /etc/openvpn/active_routers
-cat: /etc/openvpn/active_routers: No such file or directory
-root@itguy-Zeroxbit:~# ip route show table apiroutes
-Error: ipv4: FIB table does not exist.
-Dump terminated
-root@itguy-Zeroxbit:~# ip rule show | grep api
-root@itguy-Zeroxbit:~# ip route get $(host -t A api.ipify.org | grep "has address" | head -n1 | awk '{print $NF}')
+Step 5: Setting up API routing rules...
+Error: any valid prefix is expected rather than "api.ipify.org".
+
+/api-routing-diagnostics.sh
+but you didn't create this file
+
+sudo ./setup-mikrotik-routing.sh
+===== MikroTik API Routing Setup =====
+Step 1: Checking for connected MikroTik routers...
+Using MikroTik router with VPN IP: 10.8.0.6
+Step 2: Resolving API target...
+api.ipify.org resolves to 104.26.12.205
+Step 3: Setting up VPN server routing...
+Ensuring routing table exists...
+Adding route for api.ipify.org via MikroTik router...
+Error: Nexthop has invalid gateway.
+
+
+ cat /etc/openvpn/active_routers
+10.8.0.6
+
+
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ip route show table apiroutes
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ip rule show | grep api
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
+
+
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# API_IP=$(host -t A api.ipify.org | grep "has address" | head -n1 | awk '{print $NF}')
+te get $API_IProot@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ip route get $API_IP
 104.26.12.205 via 176.222.55.1 dev ens1 src 176.222.55.126 uid 0
     cache
-root@itguy-Zeroxbit:~#
