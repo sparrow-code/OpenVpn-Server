@@ -1,101 +1,97 @@
 # API Routing Troubleshooting Guide
 
-This guide will help you diagnose and fix issues with the API routing solution, focusing on resilience to IP changes.
+This guide provides solutions for the most common issues with the API routing solution.
+
+## NAT-Based Transparent Proxy Routing Technique
+
+This solution uses NAT rules instead of direct routing to avoid the "Nexthop has invalid gateway" error.
+
+### How It Works
+
+1. Traffic to API IP is DNATed to MikroTik router
+2. Return traffic is SNATed to VPN server internal IP
+3. MikroTik processes traffic through its public interface
+4. No direct routing is used, avoiding gateway issues
 
 ## Common Issues
 
-### 1. Traffic Is Not Using MikroTik Public IP
+### 1. "Nexthop has invalid gateway" Error
 
-If your API requests show the VPN server's IP (176.222.55.126) instead of the MikroTik's public IP:
-
-#### Verify MikroTik Connection
+This happens when you try to use direct routing. Fix by using NAT-based transparent proxying instead:
 
 ```bash
-# Check if MikroTik is connected to VPN
-cat /etc/openvpn/active_routers
-# Ensure at least one router IP is listed
-```
-
-#### Check Routing Tables
-
-```bash
-# Resolve current API IP
-API_IP=$(host -t A api.ipify.org | grep "has address" | head -n1 | awk '{print $NF}')
-echo "API IP: $API_IP"
-
-# Check if API route exists in special routing table
-ip route show table apiroutes
-# Should show a route to the API IP via MikroTik's VPN IP
-
-# Check if routing rules exist
-ip rule show | grep -E "(api|$API_IP)"
-# Should show rules for both domain and IP
-
-# Test API IP route lookup
-ip route get $API_IP
-# Should show route via MikroTik VPN IP
-```
-
-### 2. Missing Active Routers File
-
-If `/etc/openvpn/active_routers` is missing:
-
-```bash
-# Create the active_routers file with your MikroTik VPN IP
-mkdir -p /etc/openvpn
-echo "10.8.0.6" > /etc/openvpn/active_routers
-```
-
-### 3. Missing Routing Table
-
-If the `apiroutes` table doesn't exist:
-
-```bash
-# Add the routing table
-echo "200 apiroutes" >> /etc/iproute2/rt_tables
-
-# Verify it was created
-grep apiroutes /etc/iproute2/rt_tables
-```
-
-### 4. No API Routing Rules
-
-If API routing rules are missing:
-
-```bash
-# Get current API IP
-API_IP=$(host -t A api.ipify.org | grep "has address" | head -n1 | awk '{print $NF}')
-
-# Add routing rules
-ip rule add to api.ipify.org lookup apiroutes
-ip rule add to $API_IP lookup apiroutes
-
-# Add route to the table
-ip route add $API_IP/32 via 10.8.0.6 table apiroutes
-
-# Flush routing cache
-ip route flush cache
-```
-
-### 5. "Nexthop has invalid gateway" Error
-
-This error occurs when Linux cannot use the MikroTik VPN IP as a gateway. To fix this:
-
-```bash
-# Use the NAT approach instead of direct routing
-iptables -t nat -F PREROUTING
-iptables -t nat -F POSTROUTING
-
 # Get API IP
 API_IP=$(host -t A api.ipify.org | grep "has address" | head -n1 | awk '{print $NF}')
 MIKROTIK_VPN_IP="10.8.0.6"
 VPN_SERVER_INTERNAL_IP="10.8.0.1"
 
-# Add NAT rules
+# Clear existing rules
+iptables -t nat -F PREROUTING
+iptables -t nat -F POSTROUTING
+
+# Set up NAT-based transparent proxying
 iptables -t nat -A PREROUTING -d $API_IP -j DNAT --to-destination $MIKROTIK_VPN_IP
 iptables -t nat -A POSTROUTING -d $MIKROTIK_VPN_IP -j SNAT --to-source $VPN_SERVER_INTERNAL_IP
 ```
 
-### 6. MikroTik Router Configuration Issues
+### 2. MikroTik Command Syntax Errors
 
-The most common error is incorrect command syntax on MikroTik. Use these exact commands:
+The MikroTik router requires specific command syntax. Use these exact commands:
+
+```
+# This works - Enable IP forwarding
+/ip forward set enabled=yes
+
+# This works - Add route
+/ip route add dst-address=104.26.12.205/32 gateway=10.8.0.1 distance=1
+
+# This works - Add NAT rule
+/ip firewall nat add chain=srcnat src-address=10.8.0.1 dst-address=104.26.12.205 action=masquerade
+```
+
+### 3. Domain-Based Routing Not Working
+
+Linux IP rules don't support domain names directly. Always use IP addresses:
+
+```bash
+# This fails
+ip rule add to api.ipify.org lookup apiroutes  # Error!
+
+# This works
+API_IP=$(host -t A api.ipify.org | grep "has address" | head -n1 | awk '{print $NF}')
+ip rule add to $API_IP lookup apiroutes
+```
+
+### 4. API IP Address Changes
+
+API services like api.ipify.org use multiple IPs. Use this script to update your configuration when the IP changes:
+
+```bash
+#!/bin/bash
+API_TARGET="api.ipify.org"
+OLD_IP=$(grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' /path/to/your/config)
+NEW_IP=$(host -t A $API_TARGET | grep "has address" | head -n1 | awk '{print $NF}')
+
+if [ "$OLD_IP" != "$NEW_IP" ]; then
+    echo "IP changed from $OLD_IP to $NEW_IP, updating..."
+    # Update NAT rules
+    iptables -t nat -F PREROUTING
+    iptables -t nat -F POSTROUTING
+    iptables -t nat -A PREROUTING -d $NEW_IP -j DNAT --to-destination 10.8.0.6
+    iptables -t nat -A POSTROUTING -d 10.8.0.6 -j SNAT --to-source 10.8.0.1
+fi
+```
+
+### 5. Testing Your Setup
+
+Run this simple test to verify if your setup is working:
+
+```bash
+# Simple test
+curl http://api.ipify.org?format=json
+
+# Multiple requests test
+for i in {1..5}; do curl -s http://api.ipify.org?format=json; echo; sleep 1; done
+```
+
+If the IP shown is your MikroTik's public IP, the setup is working correctly. If it shows 176.222.55.126, it's still using your VPN server's IP.

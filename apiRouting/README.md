@@ -1,31 +1,38 @@
 # OpenVPN API Routing Solution
 
-A specialized OpenVPN configuration that enables selective routing of API traffic through multiple MikroTik routers, providing IP address rotation and failover capabilities.
+A specialized OpenVPN configuration that enables selective routing of API traffic through MikroTik routers using NAT-Based Transparent Proxy Routing.
 
 ## Overview
 
-This project provides scripts and configurations to route traffic for specific API domains (like api.ipify.org) through multiple MikroTik routers connected via OpenVPN. This setup is useful for scenarios where you need to distribute API requests across different IP addresses or ensure high availability for critical API traffic.
+This project provides scripts and configurations to route traffic for specific API domains (like api.ipify.org) through MikroTik routers connected via OpenVPN. This setup is useful for scenarios where you need to distribute API requests across different IP addresses.
 
 Key features:
 
-- Traffic to specific domains is routed through OpenVPN-connected MikroTik routers
-- Automatic IP address rotation for API requests
-- Self-healing routing table maintenance
-- Monitoring and verification tools
+- Traffic to specific API domains is routed through OpenVPN-connected MikroTik routers
+- Uses NAT-Based Transparent Proxy technique (more reliable than direct routing)
+- Simple configuration and maintenance
 - Support for custom domains
+
+## NAT-Based Transparent Proxy Routing Technique
+
+This solution uses a specialized technique that avoids common routing issues:
+
+1. **No Gateway Issues**: Avoids the "Nexthop has invalid gateway" error by using NAT instead of direct routing
+2. **IP-Based Rules**: Uses IP addresses instead of domain names in routing rules
+3. **Transparent to Applications**: Applications don't need any special configuration
+4. **Resilient to IP Changes**: Can be easily updated when API IPs change
 
 ## Directory Structure
 
 ```
 apiRouting/
-├── api_routing_setup.sh      # Main setup script
-├── custom_domain_setup.sh    # Script to add custom domains
-├── verify-routing.js         # Node.js verification script
-├── check-api-routing.sh      # Bash verification script (created by setup script)
-├── dashboard.html            # Web-based monitoring dashboard
-├── api-monitor.js            # Backend API for dashboard
-├── client_configs_guide.md   # Client configuration guide
-└── README.md                 # This file
+├── nat-proxy-routing.sh         # Main script implementing NAT-based proxy routing
+├── custom_domain_setup.sh       # Script to add custom domains
+├── verify-routing.js            # Node.js verification script
+├── test-api-routing.sh          # Simple testing script
+├── troubleshooting.md           # Troubleshooting guide
+├── client_configs_guide.md      # Client configuration guide
+└── README.md                    # This file
 ```
 
 ## Installation
@@ -33,9 +40,7 @@ apiRouting/
 ### Prerequisites
 
 - Linux server with OpenVPN server installed
-- NGINX web server (for domain proxying)
-- Node.js (for verification scripts)
-- MikroTik routers with OpenVPN client capability
+- MikroTik router with OpenVPN client capability
 
 ### Setup Instructions
 
@@ -46,17 +51,26 @@ apiRouting/
    cd openvpn-api-routing/apiRouting
    ```
 
-2. Run the main setup script:
+2. Run the NAT-based proxy routing script:
 
    ```bash
-   sudo bash api_routing_setup.sh
+   sudo bash nat-proxy-routing.sh
    ```
 
-3. Configure your MikroTik routers according to the generated `microtik_config.txt` file
+3. Configure your MikroTik router using the generated commands:
 
-4. Test the setup using the verification scripts:
+   - Copy and paste each command ONE BY ONE from the generated mikrotik-router-commands.txt file
+   - Apply them to your MikroTik router via its terminal interface
+
+4. Restart OpenVPN:
+
    ```bash
-   sudo /usr/local/bin/check-api-routing.sh 10
+   sudo systemctl restart openvpn
+   ```
+
+5. Test the setup:
+   ```bash
+   ./test-api-routing.sh
    ```
 
 ### Adding Custom Domains
@@ -67,90 +81,9 @@ To route traffic for domains other than api.ipify.org:
 sudo bash custom_domain_setup.sh your-custom-domain.com [port]
 ```
 
-## Client Configuration
-
-MikroTik routers require minimal setup. For details, see the `client_configs_guide.md` file.
-Example for MikroTik:
-
-```
-/interface ovpn-client
-add connect-to=<YOUR_VPN_SERVER_IP> name=ovpn-out1 port=1194 \
-    user=mikrotik_router1 password=<YOUR_PASSWORD> \
-    mode=ip add-default-route=no
-
-/ip route
-add dst-address=api.ipify.org/32 gateway=<VPN_SERVER_INTERNAL_IP> distance=1
-```
-
-## Monitoring
-
-### Command-Line Tools
-
-1. Check API routing:
-
-   ```bash
-   sudo /usr/local/bin/check-api-routing.sh 10
-   ```
-
-2. Node.js verification:
-
-   ```bash
-   node /usr/local/bin/verify-routing.js 20
-   ```
-
-3. Check active routers:
-
-   ```bash
-   cat /etc/openvpn/active_routers
-   ```
-
-4. View logs:
-   ```bash
-   tail -f /var/log/api_routing/learn-address.log
-   ```
-
-### Web Dashboard
-
-We provide a web-based dashboard for real-time monitoring:
-
-1. Start the dashboard backend:
-
-   ```bash
-   node api-monitor.js
-   ```
-
-2. Access the dashboard at http://your-server-ip:3000
-
-## Self-Healing Capabilities
-
-The setup includes several self-healing mechanisms:
-
-1. Automatic routing table recovery
-2. Connection monitoring for MikroTik routers
-3. Regular health checks for API endpoints
-4. Automatic failover between multiple routers
-
-## Advanced Configuration
-
-### Modifying IP Rotation Strategy
-
-By default, we use a time-based metric for IP rotation. You can modify this behavior by editing the `learn-address.sh` script.
-
-### Custom Domains
-
-The solution supports routing different API domains through different routers. See `custom_domain_setup.sh` for details.
-
-### Scaling
-
-To add more routers, simply:
-
-1. Create additional OpenVPN clients with names starting with "mikrotik\_"
-2. Connect them to your OpenVPN server
-3. The system will automatically use them for API routing
-
 ## Troubleshooting
 
-See the troubleshooting section in `client_configs_guide.md` for common issues and solutions.
+See the troubleshooting.md file for common issues and solutions.
 
 ## License
 
