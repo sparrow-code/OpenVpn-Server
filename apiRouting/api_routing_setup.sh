@@ -23,12 +23,20 @@ fi
 
 # Check for required packages
 echo "Checking prerequisites..."
-required_packages=("openvpn" "nginx" "host" "curl" "iproute2")
+required_commands=("openvpn" "nginx" "host" "curl" "ip")  # Changed iproute2 to ip
 missing_packages=()
 
-for package in "${required_packages[@]}"; do
-  if ! command -v "$package" >/dev/null 2>&1; then
-    missing_packages+=("$package")
+for cmd in "${required_commands[@]}"; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    # Map command to package name (in case they differ)
+    case "$cmd" in
+      "ip")
+        missing_packages+=("iproute2")
+        ;;
+      *)
+        missing_packages+=("$cmd")
+        ;;
+    esac
   fi
 done
 
