@@ -1,72 +1,46 @@
--Server/apiRouting# sudo chmod +x enhanced-nat-routing.sh
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# sudo ./enhanced-nat-routing.sh
-===== Enhanced API Routing Setup =====
-Date: Thu Mar 27 23:12:45 IST 2025
-Implementing dual-chain NAT with MikroTik integration
-Step 1: Setting up MikroTik connection...
-Testing connectivity...
-✓ MikroTik router is reachable
-Step 2: Resolving API target with multiple DNS servers...
-Trying DNS server 8.8.8.8...
-✓ api.ipify.org resolved to 104.26.12.205
-Step 3: Configuring network kernel parameters...
-net.ipv4.ip_forward = 1
-Enabled forwarding and proxy_arp on all
-Enabled forwarding and proxy_arp on default
-Enabled forwarding and proxy_arp on lo
-Enabled forwarding and proxy_arp on tun0
-Step 4: Setting up dedicated routing table...
-Step 5: Setting up enhanced routing...
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+Creating bridge br-apiroute with tun0...
+can't add tun0 to bridge br-apiroute: Invalid argument
+Step 5: Setting up routing for API target...
 Error: Nexthop has invalid gateway.
-Step 6: Setting up enhanced NAT rules...
-✓ Enhanced NAT rules configured
-Step 7: Flushing caches...
-Step 8: Creating MikroTik configuration...
-✓ Enhanced MikroTik configuration saved to mikrotik-enhanced-commands.rsc
+Step 6: Enabling proxy ARP...
+Step 7: Creating MikroTik configuration...
+✓ MikroTik configuration saved to mikrotik-tun-bridge-commands.txt
+Step 8: Creating persistent configuration...
+Created symlink /etc/systemd/system/multi-user.target.wants/api-tun-bridge.service → /etc/systemd/system/api-tun-bridge.service.
+Step 9: Creating test script...
 
-===== Enhanced Setup Complete =====
+===== TUN Bridge API Routing Setup Complete =====
 
-IMPORTANT: Follow these steps exactly to make it work:
+IMPORTANT STEPS TO MAKE IT WORK:
 
-1. Apply the MikroTik commands one by one from mikrotik-enhanced-commands.rsc
-   IMPORTANT: Each command must be applied separately to avoid syntax errors
+1. Configure your MikroTik router:
+   - Copy and paste each command SEPARATELY from mikrotik-tun-bridge-commands.txt
 
-2. Restart OpenVPN and networking on the server:
+2. Restart OpenVPN service:
    sudo systemctl restart openvpn
-   sudo systemctl restart networking
 
-3. Run the enhanced test script to verify the setup:
-   ./enhanced-test-api-routing.sh
+3. Test if it's working:
+   ./test-tun-bridge.sh
 
-If it's still showing the VPN server IP, check:
-1. MikroTik connection status (ping 10.8.0.6)
-2. MikroTik firewall rules that might be blocking traffic
-3. Run 'ip route get 104.26.12.205' to see the actual route being used
+If it still shows the VPN server's IP, try:
+1. Run: sudo systemctl restart api-tun-bridge.service
+2. Check if bridge is properly created: brctl show br-apiroute
+3. As a last resort, reboot your server and router
 
-Logs are stored in /var/log/api_routing for later investigation
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ip route get 104.26.12.205
-104.26.12.205 via 176.222.55.1 dev ens1 src 176.222.55.126 uid 0
-    cache
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#  sudo systemctl restart openvpn
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#  sudo systemctl restart networking
-Failed to restart networking.service: Unit networking.service not found.
-root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ./enhanced-test-api-routing.sh
-===== Enhanced API Routing Test =====
-Date: Thu Mar 27 23:14:25 IST 2025
-Testing 10 requests to http://api.ipify.org?format=json
-------------------------------------------
-VPN Server IP: 176.222.55.126
-DNS Resolution: 104.26.12.205
-NAT Rules for API IP: 3
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# ./test-tun-bridge.sh
+===== Testing TUN Bridge API Routing =====
+Making 5 requests to http://api.ipify.org?format=json
 
-[CURL] Making 10 API requests:
-Request 1:
-176.222.55.126
-Request 2: 176.222.55.126
-Request 3: 176.222.55.126
-Request 4: 176.222.55.126
-Request 5: 176.222.55.126
-Request 6: 176.222.55.126
-Request 7: 176.222.55.126
-Request 8: 176.222.55.126
-Request 9: 176.222.55.126
+Request 1: {"ip":"176.222.55.126"}
+Request 2: {"ip":"176.222.55.126"}
+Request 3: {"ip":"176.222.55.126"}
+Request 4: {"ip":"176.222.55.126"}
+^C
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#  sudo systemctl restart api-tun-bridge.service
+Job for api-tun-bridge.service failed because the control process exited with error code.
+See "systemctl status api-tun-bridge.service" and "journalctl -xeu api-tun-bridge.service" for details.
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting# brctl show br-apiroute
+bridge name     bridge id               STP enabled     interfaces
+br-apiroute             8000.46e1ceddc98a       no
+root@itguy-Zeroxbit:/home/itguy/vpn/OpenVpn-Server/apiRouting#
