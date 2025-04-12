@@ -17,6 +17,13 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 UTILS_DIR="$SCRIPT_DIR/utils"
 
+# Get the real user's home directory even when run with sudo
+if [ -n "$SUDO_USER" ]; then
+    USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+else
+    USER_HOME="$HOME"
+fi
+
 # Check if running as root
 check_root() {
     if [[ $EUID -ne 0 ]]; then
@@ -292,6 +299,11 @@ create_client() {
         return
     fi
     
+    # Create client directory in user's home directory
+    client_dir="$USER_HOME/client-configs/$client_name"
+    sudo mkdir -p "$client_dir"
+    sudo chown -R $(whoami):$(whoami) "$USER_HOME/client-configs" 2>/dev/null || true
+    
     # Check if client already exists
     if [ -f "$HOME/easy-rsa/pki/issued/$client_name.crt" ]; then
         echo -e "${YELLOW}Certificate for $client_name already exists.${NC}"
@@ -323,30 +335,127 @@ create_client() {
         return
     fi
     
-    # Create client directory
-    client_dir="$HOME/client-configs/$client_name"
-    mkdir -p "$client_dir"
-    
-    # Copy certificate files
+    # Copy certificate files to user's home directory
     cp "$HOME/easy-rsa/pki/ca.crt" "$client_dir/"
     cp "$HOME/easy-rsa/pki/issued/$client_name.crt" "$client_dir/"
     cp "$HOME/easy-rsa/pki/private/$client_name.key" "$client_dir/"
+    
+    # Set proper permissions
+    sudo chown -R $(logname):$(logname) "$client_dir" 2>/dev/null || sudo chown -R $SUDO_USER:$SUDO_USER "$client_dir" 2>/dev/null || true
     
     # Display success message
     echo
     echo -e "${GREEN}Client certificates created successfully!${NC}"
     echo -e "${YELLOW}Certificate files are in:${NC} ${CYAN}$client_dir/${NC}"
+    echo -e "${YELLOW}File listing:${NC}"
+    ls -la "$client_dir/"
     
     # Ask if they want to generate OVPN file
     read -p "Do you want to generate an .ovpn file for this client? (y/n): " gen_ovpn
     case $gen_ovpn in
         [Yy]*)
-            # Call get_vpn.sh with appropriate parameters
-            "$SCRIPT_DIR/get_vpn.sh" "$client_name"
+            # Generate OVPN file directly
+            generate_ovpn_for_client "$client_name"
             ;;
     esac
     
     read -p "Press Enter to continue..."
+}
+
+# Function to generate OVPN file for a specific client
+generate_ovpn_for_client() {
+    local client_name=$1
+    local output_dir="$USER_HOME/ovpn_configs"
+    
+    # Create output directory
+    mkdir -p "$output_dir"
+    sudo chown -R $(whoami):$(whoami) "$output_dir" 2>/dev/null || true
+    
+    # Get server information
+    echo -e "${YELLOW}Gathering server information for OVPN file...${NC}"
+    
+    # Try to detect public IPv4 address
+    echo -e "Attempting to detect your public IPv4 address..."
+    SERVER_IP=$(get_public_ip)
+    
+    if [ -n "$SERVER_IP" ]; then
+        echo -e "Detected server IP: $SERVER_IP"
+        read -p "Is this your server's public IP? (y/n): " confirm
+        
+        if [[ ! $confirm =~ ^[Yy] ]]; then
+            read -p "Enter your OpenVPN server's public IP address: " SERVER_IP
+        fi
+    else
+        read -p "Enter your OpenVPN server's public IP address: " SERVER_IP
+    fi
+    
+    # Get port from server.conf
+    if [ -f "/etc/openvpn/server.conf" ]; then
+        SERVER_PORT=$(grep "^port " /etc/openvpn/server.conf | awk '{print $2}')
+        SERVER_PROTO=$(grep "^proto " /etc/openvpn/server.conf | awk '{print $2}')
+        
+        if [ -n "$SERVER_PORT" ]; then
+            echo -e "Detected OpenVPN port: $SERVER_PORT"
+        else
+            SERVER_PORT="1194"
+        fi
+        
+        if [ -n "$SERVER_PROTO" ]; then
+            echo -e "Detected OpenVPN protocol: $SERVER_PROTO"
+        else
+            SERVER_PROTO="udp"
+        fi
+    else
+        SERVER_PORT="1194"
+        SERVER_PROTO="udp"
+    fi
+    
+    # Create the ovpn file
+    local ovpn_file="$output_dir/$client_name.ovpn"
+    
+    echo "Generating OVPN file for client: $client_name..."
+    echo "Using: IP=$SERVER_IP, PORT=$SERVER_PORT, PROTOCOL=$SERVER_PROTO"
+    
+    cat > "$ovpn_file" << EOF
+client
+dev tun
+proto $SERVER_PROTO
+remote $SERVER_IP $SERVER_PORT
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+cipher AES-256-CBC
+verb 3
+
+<ca>
+$(cat "$HOME/easy-rsa/pki/ca.crt")
+</ca>
+<cert>
+$(cat "$HOME/easy-rsa/pki/issued/$client_name.crt")
+</cert>
+<key>
+$(cat "$HOME/easy-rsa/pki/private/$client_name.key")
+</key>
+EOF
+    
+    # Ensure proper ownership
+    chmod 644 "$ovpn_file"
+    chown $(logname):$(logname) "$ovpn_file" 2>/dev/null || chown $SUDO_USER:$SUDO_USER "$ovpn_file" 2>/dev/null || true
+    
+    echo -e "${GREEN}OVPN file created successfully:${NC} ${CYAN}$ovpn_file${NC}"
+    
+    # Also copy to client configs directory
+    client_dir="$USER_HOME/client-configs/$client_name"
+    mkdir -p "$client_dir"
+    cp "$ovpn_file" "$client_dir/"
+    chmod 644 "$client_dir/$client_name.ovpn"
+    chown -R $(logname):$(logname) "$client_dir" 2>/dev/null || chown -R $SUDO_USER:$SUDO_USER "$client_dir" 2>/dev/null || true
+    
+    echo -e "${GREEN}OVPN file also copied to:${NC} ${CYAN}$client_dir/$client_name.ovpn${NC}"
+    echo -e "${YELLOW}File permissions:${NC}"
+    ls -la "$ovpn_file"
 }
 
 # Function to manage existing clients
@@ -433,7 +542,7 @@ manage_clients() {
             esac
             ;;
         2)
-            # Generate OVPN file
+            # Generate OVPN file directly using our built-in function
             read -p "Enter the number of the client to generate OVPN for: " client_num
             client_for_ovpn=$(echo "$clients" | sed -n "${client_num}p")
             
@@ -444,8 +553,8 @@ manage_clients() {
                 return
             fi
             
-            # Call get_vpn.sh with appropriate parameters
-            "$SCRIPT_DIR/get_vpn.sh" "$client_for_ovpn"
+            # Use the built-in function instead of external script
+            generate_ovpn_for_client "$client_for_ovpn"
             ;;
         3)
             # View client connection status
@@ -651,13 +760,102 @@ view_status() {
 
 # Function to set up OpenVPN
 setup_openvpn() {
-    # This function would call the setupVpn.sh script
     show_header
+    echo -e "${BOLD}${YELLOW}OpenVPN Server Setup${NC}"
+    echo
+    
+    # Check if OpenVPN is already installed
+    if command -v openvpn &> /dev/null; then
+        echo -e "${YELLOW}OpenVPN is already installed on this system.${NC}"
+        read -p "Do you want to proceed with setup anyway? (y/n): " proceed
+        if [[ ! $proceed =~ ^[Yy] ]]; then
+            echo -e "${YELLOW}Setup cancelled.${NC}"
+            read -p "Press Enter to continue..."
+            return
+        fi
+    fi
+    
+    # User inputs for server setup
+    echo -e "${CYAN}Enter your server's public IP address.${NC}"
+    echo -e "${CYAN}This is the IP address clients will connect to.${NC}"
+    read -p "Server IP [auto-detect]: " SERVER_IP
+    
+    if [ -z "$SERVER_IP" ]; then
+        SERVER_IP=$(get_public_ip)
+        echo -e "Auto-detected IP: ${GREEN}$SERVER_IP${NC}"
+    fi
+    
+    read -p "Enter OpenVPN port [default: 1194]: " VPN_PORT
+    VPN_PORT=${VPN_PORT:-1194}
+    
+    read -p "Enter VPN subnet [default: 10.8.0.0 255.255.255.0]: " VPN_SUBNET
+    VPN_SUBNET=${VPN_SUBNET:-"10.8.0.0 255.255.255.0"}
+    
+    read -p "Enter initial client name [default: client1]: " CLIENT_NAME
+    CLIENT_NAME=${CLIENT_NAME:-client1}
+
+    # Confirm configuration
+    echo
+    echo -e "${YELLOW}Configuration Summary:${NC}"
+    echo -e "Server IP: ${GREEN}$SERVER_IP${NC}"
+    echo -e "VPN Port: ${GREEN}$VPN_PORT${NC}"
+    echo -e "VPN Subnet: ${GREEN}$VPN_SUBNET${NC}"
+    echo -e "Initial Client Name: ${GREEN}$CLIENT_NAME${NC}"
+    echo
+
+    read -p "Is this configuration correct? (y/n): " confirm
+    if [[ ! $confirm =~ ^[Yy] ]]; then
+        echo -e "${RED}Setup cancelled. Please restart the script with correct configuration.${NC}"
+        read -p "Press Enter to continue..."
+        return
+    fi
+
+    # Create necessary directories in user's home
+    echo -e "${YELLOW}Creating initial directory structure...${NC}"
+    USER_CONFIG_DIR="$USER_HOME/client-configs"
+    USER_OVPN_DIR="$USER_HOME/ovpn_configs"
+    
+    mkdir -p "$USER_CONFIG_DIR"
+    mkdir -p "$USER_OVPN_DIR"
+    mkdir -p "$USER_CONFIG_DIR/$CLIENT_NAME"
+    
+    # Ensure directories have correct permissions
+    chown -R $(logname):$(logname) "$USER_CONFIG_DIR" 2>/dev/null || chown -R $SUDO_USER:$SUDO_USER "$USER_CONFIG_DIR" 2>/dev/null || true
+    chown -R $(logname):$(logname) "$USER_OVPN_DIR" 2>/dev/null || chown -R $SUDO_USER:$SUDO_USER "$USER_OVPN_DIR" 2>/dev/null || true
     
     # Check if script exists
     if [ -f "$SCRIPT_DIR/setupVpn.sh" ]; then
         echo -e "${YELLOW}Launching OpenVPN setup script...${NC}"
+        
+        # Export variables for setupVpn.sh
+        export SERVER_IP VPN_PORT VPN_SUBNET CLIENT_NAME USER_HOME
+        
+        # Run setup script
         bash "$SCRIPT_DIR/setupVpn.sh"
+        
+        # Check if setup completed successfully
+        if [ -d "$HOME/easy-rsa/pki/issued" ] && [ -f "/etc/openvpn/server.conf" ]; then
+            echo -e "${GREEN}OpenVPN server setup completed successfully!${NC}"
+            
+            # Copy certificate files from root to user directory
+            echo -e "${YELLOW}Copying certificate files to user directory...${NC}"
+            
+            sudo cp -v "$HOME/easy-rsa/pki/ca.crt" "$USER_CONFIG_DIR/$CLIENT_NAME/"
+            sudo cp -v "$HOME/easy-rsa/pki/issued/$CLIENT_NAME.crt" "$USER_CONFIG_DIR/$CLIENT_NAME/"
+            sudo cp -v "$HOME/easy-rsa/pki/private/$CLIENT_NAME.key" "$USER_CONFIG_DIR/$CLIENT_NAME/"
+            
+            # Fix permissions
+            sudo chown -R $(logname):$(logname) "$USER_CONFIG_DIR" 2>/dev/null || sudo chown -R $SUDO_USER:$SUDO_USER "$USER_CONFIG_DIR" 2>/dev/null || true
+            
+            # Generate OVPN file
+            generate_ovpn_for_client "$CLIENT_NAME"
+            
+            # Show file listing
+            echo -e "${YELLOW}Client certificate files:${NC}"
+            ls -la "$USER_CONFIG_DIR/$CLIENT_NAME/"
+        else
+            echo -e "${RED}OpenVPN setup encountered issues. Please check logs.${NC}"
+        fi
     else
         echo -e "${RED}Setup script not found.${NC}"
         echo -e "${RED}Expected path: $SCRIPT_DIR/setupVpn.sh${NC}"
