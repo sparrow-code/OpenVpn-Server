@@ -128,11 +128,63 @@ fi
 
 # Check 6: Firewall rules
 echo "6. Checking firewall rules..."
-if iptables -C INPUT -i $VPN_IF -j ACCEPT &>/dev/null; then
-    success "Firewall allows incoming traffic from VPN interface"
+
+# Check if UFW is being used
+if command -v ufw &> /dev/null && ufw status | grep -q "Status: active"; then
+    echo "UFW firewall is active, checking rules..."
+    
+    # Check if OpenVPN port is allowed
+    if ufw status | grep -q "$VPN_PORT/$VPN_PROTO"; then
+        success "UFW allows OpenVPN port $VPN_PORT/$VPN_PROTO"
+    else
+        failure "UFW might be blocking OpenVPN traffic"
+        echo "   Run: sudo ufw allow $VPN_PORT/$VPN_PROTO"
+        echo "   Add rule to $FIX_SCRIPT"
+        echo "ufw allow $VPN_PORT/$VPN_PROTO" >> $FIX_SCRIPT
+    fi
+    
+    # Check for routing rules
+    if ufw status | grep -q "tun0"; then
+        success "UFW has routing rules for VPN interface"
+    else
+        failure "UFW might be blocking VPN routing"
+        echo "   Run: sudo ufw route allow in on $VPN_IF out on $EXTERNAL_IF"
+        echo "ufw route allow in on $VPN_IF out on $EXTERNAL_IF" >> $FIX_SCRIPT
+    fi
+    
+    # Check UFW forwarding policy
+    if grep -q "DEFAULT_FORWARD_POLICY=\"ACCEPT\"" /etc/default/ufw; then
+        success "UFW forwarding policy is set to ACCEPT"
+    else
+        failure "UFW forwarding policy is not set to ACCEPT"
+        echo "echo 'Setting UFW forwarding policy to ACCEPT...'" >> $FIX_SCRIPT
+        echo "sed -i 's/DEFAULT_FORWARD_POLICY=\"DROP\"/DEFAULT_FORWARD_POLICY=\"ACCEPT\"/g' /etc/default/ufw" >> $FIX_SCRIPT
+    fi
+    
+    # Check NAT rules in before.rules
+    if grep -q "POSTROUTING -s 10.8.0.0/24" /etc/ufw/before.rules; then
+        success "UFW has NAT masquerading rules for VPN"
+    else
+        failure "UFW does not have NAT masquerading rules for VPN"
+        echo "echo 'Adding NAT rules to UFW...'" >> $FIX_SCRIPT
+        echo "cat << EOF | sed -i '1r /dev/stdin' /etc/ufw/before.rules" >> $FIX_SCRIPT
+        echo "# NAT for OpenVPN" >> $FIX_SCRIPT
+        echo "*nat" >> $FIX_SCRIPT
+        echo ":POSTROUTING ACCEPT [0:0]" >> $FIX_SCRIPT
+        echo "-A POSTROUTING -s 10.8.0.0/24 -o $EXTERNAL_IF -j MASQUERADE" >> $FIX_SCRIPT
+        echo "COMMIT" >> $FIX_SCRIPT
+        echo "EOF" >> $FIX_SCRIPT
+        echo "ufw reload" >> $FIX_SCRIPT
+    fi
 else
-    failure "Firewall might be blocking incoming VPN traffic"
-    echo "   Run: sudo iptables -A INPUT -i $VPN_IF -j ACCEPT"
+    # Check traditional iptables
+    if iptables -C INPUT -i $VPN_IF -j ACCEPT &>/dev/null; then
+        success "Firewall allows incoming traffic from VPN interface"
+    else
+        failure "Firewall might be blocking incoming VPN traffic"
+        echo "   Run: sudo iptables -A INPUT -i $VPN_IF -j ACCEPT"
+        echo "iptables -A INPUT -i $VPN_IF -j ACCEPT" >> $FIX_SCRIPT
+    fi
 fi
 
 # Fix suggestions

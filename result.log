@@ -1,0 +1,204 @@
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ sudo bash ./utils/vpn_diagnostics.sh
+===============================================
+           OpenVPN Server Diagnostics
+===============================================
+
+Detected network interfaces:
+- External interface: eth0
+- VPN interface: tun0
+----------------------------------------------
+Checking OpenVPN service status...
+✅ OpenVPN service is running.
+Checking IP forwarding...
+❌ IP forwarding is NOT enabled.
+   Enable it temporarily with: sudo sysctl -w net.ipv4.ip_forward=1
+   Enable it permanently by adding 'net.ipv4.ip_forward=1' to /etc/sysctl.conf
+   and running: sudo sysctl -p
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ sudo bash ./utils/vpn_diagnostics.sh
+===============================================
+           OpenVPN Server Diagnostics
+===============================================
+
+Detected network interfaces:
+- External interface: eth0
+- VPN interface: tun0
+----------------------------------------------
+Checking OpenVPN service status...
+✅ OpenVPN service is running.
+Checking IP forwarding...
+✅ IP forwarding is enabled.
+Checking firewall rules...
+❌ NAT rule for VPN traffic is missing.
+   Add it using: sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+❌ Some firewall forwarding rules are missing:
+   Missing rule: sudo iptables -A FORWARD -i tun0 -o eth0 -j ACCEPT
+   Missing rule: sudo iptables -A FORWARD -i eth0 -o tun0 -j ACCEPT
+   These rules are needed to allow traffic forwarding between VPN clients and the internet.
+Checking DNS resolution...
+✅ Internet connectivity is working.
+✅ DNS resolution is working.
+Checking VPN tunnel...
+✅ VPN tunnel is up with IP: 10.8.0.1
+ℹ️ No clients currently connected to the VPN
+Testing internet access through VPN...
+
+
+^C
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ ^C
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ ^C
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ ^C
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ sudo bash ./utils/vpn_troubleshoot.sh 10.8.0.5
+===============================================
+           OpenVPN Server-Client Connectivity Troubleshooter
+===============================================
+
+Testing connectivity to VPN client: 10.8.0.5
+----------------------------------------------
+1. Checking VPN interface...
+✅ VPN interface tun0 is UP
+2. Checking routes to client...
+ℹ️ No specific route to client found
+   Checking general VPN subnet routes...
+❌ No route to VPN subnet found
+   Adding route to VPN subnet...
+Error: any valid prefix is expected rather than "10.8.0.0/.255.255.0".
+   Route added: 10.8.0.0/.255.255.0 via tun0
+3. Checking client-to-client communication...
+ℹ️ client-to-client communication directive not found in server.conf
+   This is fine for server-to-client pings, but clients cannot ping each other
+4. Testing basic connectivity to client...
+❌ Cannot ping client
+   Possible causes:
+   1. Client firewall is blocking ICMP packets
+   2. Client is not properly connected to VPN
+   3. Routing issues between server and client
+5. Checking if client is connected...
+❌ Client with IP 10.8.0.5 is not found in status log
+   The client might not be connected to the VPN
+6. Checking firewall rules...
+❌ Firewall might be blocking incoming VPN traffic
+   Run: sudo iptables -A INPUT -i tun0 -j ACCEPT
+
+===============================================
+Suggested fixes:
+-----------------------------------------------
+Added: iptables rule to allow traffic from VPN
+Added: direct route to client
+Added: client-to-client directive to server.conf
+
+Instructions for client-side:
+1. Check if the client firewall allows incoming ICMP packets (ping)
+2. For Windows clients, try: netsh advfirewall firewall add rule name="Allow ICMP" protocol=icmpv4:8,any dir=in action=allow
+3. For Linux clients, try: sudo iptables -A INPUT -p icmp -j ACCEPT
+
+To apply server-side fixes automatically, run:
+sudo bash /tmp/vpn_client_connectivity_fix.sh
+===============================================
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ sudo bash /tmp/vpn_client_connectivity_fix.sh
+Applying fixes to fix VPN client connectivity issues...
+Adding firewall rule to allow incoming VPN traffic...
+Adding direct route to client...
+Enabling client-to-client communication...
+Restarting OpenVPN to apply changes...
+
+
+
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ sudo iptables -L -n
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination
+ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0
+
+Chain FORWARD (policy ACCEPT)
+target     prot opt source               destination
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ sudo ufw status
+Status: inactive
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$
+
+
+
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ sudo ufw status
+Status: inactive
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ sysctl net.ipv4.ip_forward
+net.ipv4.ip_forward = 1
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ nslookup google.com
+Server:         160.191.14.242
+Address:        160.191.14.242#53
+
+Non-authoritative answer:
+Name:   google.com
+Address: 142.250.194.206
+Name:   google.com
+Address: 2404:6800:4002:80c::200e
+
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$ sudo systemctl status openvpn@server
+● openvpn@server.service - OpenVPN connection to server
+     Loaded: loaded (/lib/systemd/system/openvpn@.service; enabled; vendor preset: enabled)
+     Active: active (running) since Sat 2025-04-12 19:54:01 IST; 2min 10s ago
+       Docs: man:openvpn(8)
+             https://community.openvpn.net/openvpn/wiki/Openvpn24ManPage
+             https://community.openvpn.net/openvpn/wiki/HOWTO
+   Main PID: 3930 (openvpn)
+     Status: "Initialization Sequence Completed"
+      Tasks: 1 (limit: 4575)
+     Memory: 2.0M
+        CPU: 52ms
+     CGroup: /system.slice/system-openvpn.slice/openvpn@server.service
+             └─3930 /usr/sbin/openvpn --daemon ovpn-server --status /run/openvpn/server.status 10 --cd /etc/openvpn --script-security 2 --config /et>
+
+Apr 12 19:54:06 0qKKkjgGSCulmW8XMW2t.xenax-cloud.com ovpn-server[3930]: 106.201.23.244:63623 Control Channel: TLSv1.3, cipher TLSv1.3 TLS_AES_256_GC>
+Apr 12 19:54:06 0qKKkjgGSCulmW8XMW2t.xenax-cloud.com ovpn-server[3930]: 106.201.23.244:63623 [routeros] Peer Connection Initiated with [AF_INET]106.>
+Apr 12 19:54:06 0qKKkjgGSCulmW8XMW2t.xenax-cloud.com ovpn-server[3930]: routeros/106.201.23.244:63623 MULTI_sva: pool returned IPv4=10.8.0.6, IPv6=(>
+Apr 12 19:54:06 0qKKkjgGSCulmW8XMW2t.xenax-cloud.com ovpn-server[3930]: routeros/106.201.23.244:63623 MULTI: Learn: 10.8.0.6 -> routeros/106.201.23.>
+Apr 12 19:54:06 0qKKkjgGSCulmW8XMW2t.xenax-cloud.com ovpn-server[3930]: routeros/106.201.23.244:63623 MULTI: primary virtual IP for routeros/106.201>
+Apr 12 19:54:06 0qKKkjgGSCulmW8XMW2t.xenax-cloud.com ovpn-server[3930]: routeros/106.201.23.244:63623 Data Channel: using negotiated cipher 'AES-256>
+Apr 12 19:54:06 0qKKkjgGSCulmW8XMW2t.xenax-cloud.com ovpn-server[3930]: routeros/106.201.23.244:63623 Outgoing Data Channel: Cipher 'AES-256-GCM' in>
+Apr 12 19:54:06 0qKKkjgGSCulmW8XMW2t.xenax-cloud.com ovpn-server[3930]: routeros/106.201.23.244:63623 Incoming Data Channel: Cipher 'AES-256-GCM' in>
+Apr 12 19:54:06 0qKKkjgGSCulmW8XMW2t.xenax-cloud.com ovpn-server[3930]: routeros/106.201.23.244:63623 SENT CONTROL [routeros]: 'PUSH_REPLY,redirect->
+Apr 12 19:54:06 0qKKkjgGSCulmW8XMW2t.xenax-cloud.com ovpn-server[3930]: routeros/106.201.23.244:63623 PUSH: Received control message: 'PUSH_REQUEST'
+lines 1-24/24 (END)
+
+
+
+
+
+
+
+=================================================
+           OpenVPN Management System
+=================================================
+
+OpenVPN Server Status
+
+Service Status:
+● OpenVPN server is running
+
+Interface Information:
+3: tun0: <POINTOPOINT,MULTICAST,NOARP,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN group default qlen 500
+    link/none
+    inet 10.8.0.1 peer 10.8.0.2/32 scope global tun0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::c46:71dd:b8d9:21d0/64 scope link stable-privacy
+       valid_lft forever preferred_lft forever
+
+Connected Clients:
+No clients currently connected
+
+Network Configuration:
+10.8.0.0/24 via 10.8.0.2 dev tun0
+10.8.0.2 dev tun0 proto kernel scope link src 10.8.0.1
+
+Server Configuration:
+Port: 1194
+Protocol: tcp
+Cipher: AES-256-CBC
+Network: 10.8.0.0/255.255.0
+Client-to-client: Enabled
+Press Enter to continue...

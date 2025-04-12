@@ -1,0 +1,28 @@
+OpenVPN Server Status
+
+Service Status:
+● OpenVPN server is running
+
+Interface Information:
+3: tun0: <POINTOPOINT,MULTICAST,NOARP,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN group default qlen 500
+    link/none
+    inet 10.8.0.1 peer 10.8.0.2/32 scope global tun0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::c46:71dd:b8d9:21d0/64 scope link stable-privacy
+       valid_lft forever preferred_lft forever
+
+Connected Clients:
+No clients currently connected
+
+Network Configuration:
+10.8.0.0/24 via 10.8.0.2 dev tun0
+10.8.0.2 dev tun0 proto kernel scope link src 10.8.0.1
+
+Server Configuration:
+Port: 1194
+Protocol: tcp
+Cipher: AES-256-CBC
+Network: 10.8.0.0/255.255.0
+Client-to-client: Enabled
+Press Enter to continue...
+sdworlld@0qKKkjgGSCulmW8XMW2t:~/isp/OpenVpn-Server$

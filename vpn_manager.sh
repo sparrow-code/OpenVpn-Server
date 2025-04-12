@@ -150,10 +150,12 @@ diagnostics_menu() {
     echo -e "${CYAN}2)${NC} Troubleshoot Client Connection"
     echo -e "${CYAN}3)${NC} Switch between TCP/UDP Protocol"
     echo -e "${CYAN}4)${NC} Configure VPN Killswitch"
+    echo -e "${CYAN}5)${NC} Check Port and Firewall" 
+    echo -e "${CYAN}6)${NC} Fix OpenVPN Connectivity Issues"
     echo -e "${CYAN}0)${NC} Return to Main Menu"
     echo
     
-    read -p "Enter your choice [0-4]: " diag_choice
+    read -p "Enter your choice [0-6]: " diag_choice
     
     case $diag_choice in
         1)
@@ -263,6 +265,34 @@ diagnostics_menu() {
                     bash "$UTILS_DIR/vpn_killswitch.sh" status
                     ;;
             esac
+            read -p "Press Enter to continue..."
+            diagnostics_menu
+            ;;
+        5)
+            show_header
+            echo -e "${BOLD}${YELLOW}Port and Firewall Check${NC}"
+            echo
+            echo -e "This tool checks if the OpenVPN port is open and properly configured in the firewall."
+            echo -e "It will help identify issues with connectivity and firewall configuration."
+            echo
+            
+            bash "$UTILS_DIR/check_port_and_firewall.sh"
+            read -p "Press Enter to continue..."
+            diagnostics_menu
+            ;;
+        6)
+            show_header
+            echo -e "${BOLD}${YELLOW}OpenVPN Connectivity Fix${NC}"
+            echo
+            echo -e "This tool helps fix common connectivity issues with OpenVPN."
+            echo -e "It will configure IP forwarding, set up firewall rules, and restart the OpenVPN service."
+            echo
+            echo -e "${RED}Warning: This will modify your system configuration.${NC}"
+            read -p "Are you sure you want to continue? (y/n): " confirm
+            
+            if [[ $confirm =~ ^[Yy] ]]; then
+                bash "$UTILS_DIR/openvpn_fix_connectivity.sh"
+            fi
             read -p "Press Enter to continue..."
             diagnostics_menu
             ;;

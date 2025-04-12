@@ -19,6 +19,7 @@ ifconfig-pool-persist ipp.txt
 push "redirect-gateway def1 bypass-dhcp"
 push "dhcp-option DNS 8.8.8.8"
 push "dhcp-option DNS 8.8.4.4"
+client-to-client
 keepalive 10 120
 cipher AES-256-CBC
 user nobody
