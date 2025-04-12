@@ -62,44 +62,99 @@ fi
 # 3. Check firewall rules for VPN traffic
 echo "Checking firewall rules..."
 
-# Check NAT rule
-if iptables -t nat -C POSTROUTING -o $EXTERNAL_IF -j MASQUERADE &>/dev/null; then
-    success "NAT rule for VPN traffic is properly configured."
-else
-    failure "NAT rule for VPN traffic is missing."
-    echo "   Add it using: sudo iptables -t nat -A POSTROUTING -o $EXTERNAL_IF -j MASQUERADE"
-    NAT_MISSING=true
-    ISSUES_FOUND=true
-fi
-
-# Check forwarding rules
-FORWARD_RULE1_OK=false
-FORWARD_RULE2_OK=false
-
-if iptables -C FORWARD -i $VPN_IF -o $EXTERNAL_IF -j ACCEPT &>/dev/null; then
-    FORWARD_RULE1_OK=true
-fi
-
-if iptables -C FORWARD -i $EXTERNAL_IF -o $VPN_IF -j ACCEPT &>/dev/null; then
-    FORWARD_RULE2_OK=true
-fi
-
-if $FORWARD_RULE1_OK && $FORWARD_RULE2_OK; then
-    success "Firewall forwarding rules are properly configured."
-else
-    failure "Some firewall forwarding rules are missing:"
+# First, check if UFW is installed and active
+if command -v ufw &> /dev/null && ufw status | grep -q "Status: active"; then
+    success "UFW firewall is active."
     
-    if ! $FORWARD_RULE1_OK; then
-        echo "   Missing rule: sudo iptables -A FORWARD -i $VPN_IF -o $EXTERNAL_IF -j ACCEPT"
+    # Check if OpenVPN port is allowed
+    VPN_PORT=$(grep "^port " /etc/openvpn/server.conf | awk '{print $2}' || echo "1194")
+    VPN_PROTO=$(grep "^proto " /etc/openvpn/server.conf | awk '{print $2}' || echo "udp")
+    
+    if ufw status | grep -q "$VPN_PORT/$VPN_PROTO"; then
+        success "UFW allows OpenVPN port $VPN_PORT/$VPN_PROTO."
+    else
+        failure "UFW might be blocking OpenVPN traffic on port $VPN_PORT/$VPN_PROTO."
+        echo "   Add rule with: sudo ufw allow $VPN_PORT/$VPN_PROTO"
+        UFW_PORT_MISSING=true
+        ISSUES_FOUND=true
     fi
     
-    if ! $FORWARD_RULE2_OK; then
-        echo "   Missing rule: sudo iptables -A FORWARD -i $EXTERNAL_IF -o $VPN_IF -j ACCEPT"
+    # Check UFW forwarding policy
+    if grep -q "DEFAULT_FORWARD_POLICY=\"ACCEPT\"" /etc/default/ufw; then
+        success "UFW forwarding policy is properly set to ACCEPT."
+    else
+        failure "UFW forwarding policy is set to DROP, which will block VPN traffic forwarding."
+        echo "   Fix with: sudo sed -i 's/DEFAULT_FORWARD_POLICY=\"DROP\"/DEFAULT_FORWARD_POLICY=\"ACCEPT\"/g' /etc/default/ufw"
+        UFW_FORWARDING_DISABLED=true
+        ISSUES_FOUND=true
     fi
     
-    echo "   These rules are needed to allow traffic forwarding between VPN clients and the internet."
-    FIREWALL_MISSING=true
-    ISSUES_FOUND=true
+    # Check NAT masquerading in UFW
+    if grep -q "POSTROUTING -s 10.8.0.0/24" /etc/ufw/before.rules; then
+        success "UFW NAT masquerading for VPN traffic is properly configured."
+    else
+        failure "UFW NAT masquerading for VPN traffic is missing."
+        echo "   This is needed to route VPN traffic to the internet."
+        echo "   Run the migrate_to_ufw.sh script to automatically configure this."
+        UFW_NAT_MISSING=true
+        ISSUES_FOUND=true
+    fi
+    
+    # Check routing rules
+    if ufw status | grep -qE "ALLOW.*$VPN_IF.*$EXTERNAL_IF"; then
+        success "UFW routing for VPN to internet is properly configured."
+    else
+        failure "UFW routing for VPN to internet is missing."
+        echo "   Add rule with: sudo ufw route allow in on $VPN_IF out on $EXTERNAL_IF"
+        UFW_ROUTE_MISSING=true
+        ISSUES_FOUND=true
+    fi
+
+else
+    # Fall back to checking iptables rules if UFW is not active
+    warning "UFW is not active. Checking traditional iptables rules instead."
+    
+    # Check NAT rule
+    if iptables -t nat -C POSTROUTING -o $EXTERNAL_IF -j MASQUERADE &>/dev/null; then
+        success "NAT rule for VPN traffic is properly configured."
+    else
+        failure "NAT rule for VPN traffic is missing."
+        echo "   Add it using: sudo iptables -t nat -A POSTROUTING -o $EXTERNAL_IF -j MASQUERADE"
+        echo "   Alternatively, consider using UFW with the migrate_to_ufw.sh script."
+        NAT_MISSING=true
+        ISSUES_FOUND=true
+    fi
+
+    # Check forwarding rules
+    FORWARD_RULE1_OK=false
+    FORWARD_RULE2_OK=false
+
+    if iptables -C FORWARD -i $VPN_IF -o $EXTERNAL_IF -j ACCEPT &>/dev/null; then
+        FORWARD_RULE1_OK=true
+    fi
+
+    if iptables -C FORWARD -i $EXTERNAL_IF -o $VPN_IF -j ACCEPT &>/dev/null; then
+        FORWARD_RULE2_OK=true
+    fi
+
+    if $FORWARD_RULE1_OK && $FORWARD_RULE2_OK; then
+        success "Firewall forwarding rules are properly configured."
+    else
+        failure "Some firewall forwarding rules are missing:"
+        
+        if ! $FORWARD_RULE1_OK; then
+            echo "   Missing rule: sudo iptables -A FORWARD -i $VPN_IF -o $EXTERNAL_IF -j ACCEPT"
+        fi
+        
+        if ! $FORWARD_RULE2_OK; then
+            echo "   Missing rule: sudo iptables -A FORWARD -i $EXTERNAL_IF -o $VPN_IF -j ACCEPT"
+        fi
+        
+        echo "   These rules are needed to allow traffic forwarding between VPN clients and the internet."
+        echo "   Consider using the migrate_to_ufw.sh script for easier firewall management."
+        FIREWALL_MISSING=true
+        ISSUES_FOUND=true
+    fi
 fi
 
 # 4. Check DNS resolution
