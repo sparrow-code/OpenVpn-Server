@@ -34,6 +34,15 @@ else
     echo "- Protocol: $VPN_PROTO"
 fi
 
+# Get VPN subnet from server.conf
+if [ -f "/etc/openvpn/server.conf" ]; then
+    VPN_SUBNET=$(grep "^server " /etc/openvpn/server.conf | awk '{print $2"/"substr($3,4)}' || echo "10.8.0.0/24")
+else
+    VPN_SUBNET="10.8.0.0/24"
+fi
+
+echo "- VPN Subnet: $VPN_SUBNET"
+
 # Detect network interfaces
 EXTERNAL_IF=$(ip -4 route show default | grep -Po '(?<=dev )(\S+)' | head -1)
 VPN_IF=$(ip addr | grep -E '^[0-9]+: tun' | cut -d: -f2 | tr -d ' ' | head -1)
