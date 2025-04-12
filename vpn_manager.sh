@@ -365,11 +365,13 @@ create_client() {
 # Function to generate OVPN file for a specific client
 generate_ovpn_for_client() {
     local client_name=$1
-    local output_dir="$USER_HOME/ovpn_configs"
     
-    # Create output directory
-    mkdir -p "$output_dir"
-    sudo chown -R $(whoami):$(whoami) "$output_dir" 2>/dev/null || true
+    # Use a single location for all client files
+    local client_dir="$USER_HOME/client-configs/$client_name"
+    
+    # Create client directory if it doesn't exist
+    mkdir -p "$client_dir"
+    sudo chown -R $(whoami):$(whoami) "$client_dir" 2>/dev/null || true
     
     # Get server information
     echo -e "${YELLOW}Gathering server information for OVPN file...${NC}"
@@ -410,8 +412,8 @@ generate_ovpn_for_client() {
         SERVER_PROTO="udp"
     fi
     
-    # Create the ovpn file
-    local ovpn_file="$output_dir/$client_name.ovpn"
+    # Create the ovpn file directly in the client directory
+    local ovpn_file="$client_dir/$client_name.ovpn"
     
     echo "Generating OVPN file for client: $client_name..."
     echo "Using: IP=$SERVER_IP, PORT=$SERVER_PORT, PROTOCOL=$SERVER_PROTO"
@@ -445,15 +447,6 @@ EOF
     chown $(logname):$(logname) "$ovpn_file" 2>/dev/null || chown $SUDO_USER:$SUDO_USER "$ovpn_file" 2>/dev/null || true
     
     echo -e "${GREEN}OVPN file created successfully:${NC} ${CYAN}$ovpn_file${NC}"
-    
-    # Also copy to client configs directory
-    client_dir="$USER_HOME/client-configs/$client_name"
-    mkdir -p "$client_dir"
-    cp "$ovpn_file" "$client_dir/"
-    chmod 644 "$client_dir/$client_name.ovpn"
-    chown -R $(logname):$(logname) "$client_dir" 2>/dev/null || chown -R $SUDO_USER:$SUDO_USER "$client_dir" 2>/dev/null || true
-    
-    echo -e "${GREEN}OVPN file also copied to:${NC} ${CYAN}$client_dir/$client_name.ovpn${NC}"
     echo -e "${YELLOW}File permissions:${NC}"
     ls -la "$ovpn_file"
 }
@@ -813,15 +806,10 @@ setup_openvpn() {
     # Create necessary directories in user's home
     echo -e "${YELLOW}Creating initial directory structure...${NC}"
     USER_CONFIG_DIR="$USER_HOME/client-configs"
-    USER_OVPN_DIR="$USER_HOME/ovpn_configs"
-    
-    mkdir -p "$USER_CONFIG_DIR"
-    mkdir -p "$USER_OVPN_DIR"
     mkdir -p "$USER_CONFIG_DIR/$CLIENT_NAME"
     
     # Ensure directories have correct permissions
     chown -R $(logname):$(logname) "$USER_CONFIG_DIR" 2>/dev/null || chown -R $SUDO_USER:$SUDO_USER "$USER_CONFIG_DIR" 2>/dev/null || true
-    chown -R $(logname):$(logname) "$USER_OVPN_DIR" 2>/dev/null || chown -R $SUDO_USER:$SUDO_USER "$USER_OVPN_DIR" 2>/dev/null || true
     
     # Check if script exists
     if [ -f "$SCRIPT_DIR/setupVpn.sh" ]; then
