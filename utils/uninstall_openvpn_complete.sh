@@ -4,19 +4,36 @@
 
 set -e
 
+# Define colors for better readability
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
 # Function to display progress
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] $1${NC}"
+}
+
+# Function to display warnings
+warn() {
+    echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $1${NC}"
+}
+
+# Function to display errors
+error() {
+    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}"
 }
 
 # Check if running with root privileges
 if [ "$(id -u)" -ne 0 ]; then
-    echo "This script must be run as root. Please use sudo."
+    echo -e "${RED}This script must be run as root. Please use sudo.${NC}"
     exit 1
 fi
 
 log "Starting complete OpenVPN uninstallation process..."
-log "This will remove OpenVPN, all configurations, certificates, and API routing components."
+warn "This will remove OpenVPN, all configurations, certificates, and API routing components."
 
 # Ask for confirmation before proceeding
 echo -n "Are you sure you want to completely remove OpenVPN and all its components? (y/n): "

@@ -1,0 +1,116 @@
+:~$ docker network ls
+NETWORK ID     NAME                    DRIVER    SCOPE
+a410caff0ef0   bridge                  bridge    local
+656f9918f97e   host                    host      local
+41b0763a5c16   hosting_my-network      bridge    local
+ec646bad0af0   hosting_whmcs-network   bridge    local
+97d4e2900019   my-network              bridge    local
+066871e8a8e8   none                    null      local
+itguy@itguy-Zeroxbit:~$ ip addr | grep -E 'br-[0-9a-f]+'
+3: br-41b0763a5c16: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default
+    inet 172.18.0.1/16 brd 172.18.255.255 scope global br-41b0763a5c16
+4: br-97d4e2900019: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default
+    inet 172.20.0.1/16 brd 172.20.255.255 scope global br-97d4e2900019
+5: br-ec646bad0af0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default
+    inet 172.19.0.1/16 brd 172.19.255.255 scope global br-ec646bad0af0
+12: vethcb23597@if11: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br-97d4e2900019 state UP group default
+itguy@itguy-Zeroxbit:~$
+
+
+itguy@itguy-Zeroxbit:~$ for network in $(docker network ls --format "{{.ID}}"); do
+>   echo "Network: $(docker network inspect $network --format '{{.Name}}')";
+>   echo "Containers connected: $(docker network inspect $network --format '{{len .Containers}}')"
+> done
+Network: bridge
+Containers connected: 1
+Network: host
+Containers connected: 0
+Network: hosting_my-network
+Containers connected: 0
+Network: hosting_whmcs-network
+Containers connected: 0
+Network: my-network
+Containers connected: 1
+Network: none
+Containers connected: 0
+itguy@itguy-Zeroxbit:~$
+
+
+itguy@itguy-Zeroxbit:~$ docker network rm hosting_my-network
+hosting_my-network
+itguy@itguy-Zeroxbit:~$ docker network rm hosting_whmcs-network
+hosting_whmcs-network
+itguy@itguy-Zeroxbit:~$ docker network ls
+NETWORK ID     NAME         DRIVER    SCOPE
+a410caff0ef0   bridge       bridge    local
+656f9918f97e   host         host      local
+97d4e2900019   my-network   bridge    local
+066871e8a8e8   none         null      local
+itguy@itguy-Zeroxbit:~$ ip addr | grep -E 'br-[0-9a-f]+'
+4: br-97d4e2900019: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default
+    inet 172.20.0.1/16 brd 172.20.255.255 scope global br-97d4e2900019
+12: vethcb23597@if11: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br-97d4e2900019 state UP group default
+itguy@itguy-Zeroxbit:~$ sudo systemctl restart docker
+[sudo] password for itguy:
+itguy@itguy-Zeroxbit:~$ docker ps -a
+CONTAINER ID   IMAGE                         COMMAND     CREATED        STATUS         PORTS                                                                                  NAMES
+a06b60eb4868   mattrayner/lamp:latest-1604   "/run.sh"   5 months ago   Up 6 seconds   0.0.0.0:4000->80/tcp, [::]:4000->80/tcp, 0.0.0.0:3307->3306/tcp, [::]:3307->3306/tcp   ecstatic_kepler
+538e98029c18   mattrayner/lamp:latest-1804   "/run.sh"   5 months ago   Up 6 seconds   3306/tcp, 0.0.0.0:3004->80/tcp, [::]:3004->80/tcp                                      xenodochial_bouman
+itguy@itguy-Zeroxbit:~$
+
+
+
+~$ ifconfig
+br-97d4e2900019: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 172.20.0.1  netmask 255.255.0.0  broadcast 172.20.255.255
+        inet6 fe80::42:7ff:feb0:4682  prefixlen 64  scopeid 0x20<link>
+        ether 02:42:07:b0:46:82  txqueuelen 0  (Ethernet)
+        RX packets 102150  bytes 97048782 (97.0 MB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 102408  bytes 19420069 (19.4 MB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+docker0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 172.17.0.1  netmask 255.255.0.0  broadcast 172.17.255.255
+        inet6 fe80::42:b9ff:fe7f:6aa3  prefixlen 64  scopeid 0x20<link>
+        ether 02:42:b9:7f:6a:a3  txqueuelen 0  (Ethernet)
+        RX packets 460172564  bytes 324789727554 (324.7 GB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 482104172  bytes 51250590447 (51.2 GB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+ens1: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 176.222.55.126  netmask 255.255.255.0  broadcast 176.222.55.255
+        inet6 fe80::546f:eeff:fe5b:9a3  prefixlen 64  scopeid 0x20<link>
+        ether 56:6f:ee:5b:09:a3  txqueuelen 1000  (Ethernet)
+        RX packets 56738839  bytes 10099476928 (10.0 GB)
+        RX errors 0  dropped 661431  overruns 0  frame 0
+        TX packets 23083701  bytes 17451450619 (17.4 GB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
+        inet 127.0.0.1  netmask 255.0.0.0
+        inet6 ::1  prefixlen 128  scopeid 0x10<host>
+        loop  txqueuelen 1000  (Local Loopback)
+        RX packets 2654662  bytes 1006593732 (1.0 GB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 2654662  bytes 1006593732 (1.0 GB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+vethc93583f: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet6 fe80::7c70:2bff:fec2:46d4  prefixlen 64  scopeid 0x20<link>
+        ether 7e:70:2b:c2:46:d4  txqueuelen 0  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 11  bytes 946 (946.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+vethdc04031: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet6 fe80::605b:dff:fe90:920f  prefixlen 64  scopeid 0x20<link>
+        ether 62:5b:0d:90:92:0f  txqueuelen 0  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 42  bytes 2248 (2.2 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+itguy@itguy-Zeroxbit:~$

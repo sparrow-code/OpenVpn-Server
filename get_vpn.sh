@@ -1,7 +1,14 @@
 #!/bin/bash
 
-echo "=== OpenVPN Client Configuration Generator ==="
-echo "This script generates .ovpn configuration files for OpenVPN clients."
+# Define colors for better readability
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}=== OpenVPN Client Configuration Generator ===${NC}"
+echo -e "${GREEN}This script generates .ovpn configuration files for OpenVPN clients.${NC}"
 
 # Get the real user's home directory even when run with sudo
 if [ -n "$SUDO_USER" ]; then

@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Define colors for better readability
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
 # VPN Killswitch Script
 # ---------------------
 # This script implements a firewall-based VPN killswitch that prevents IP leakage
@@ -27,8 +35,8 @@ detect_local_subnet() {
 
 # Check for root privileges
 if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root (sudo)"
-   exit 1
+  echo -e "${RED}This script must be run as root (sudo)${NC}"
+  exit 1
 fi
 
 # Auto-detect interfaces and networks
@@ -36,19 +44,19 @@ EXTERNAL_IF=$(detect_external_interface)
 LOCAL_SUBNET=$(detect_local_subnet)
 
 if [ -z "$EXTERNAL_IF" ]; then
-    echo "ERROR: Could not detect external network interface."
-    echo "Please specify your external interface manually by editing this script."
+    echo -e "${RED}ERROR: Could not detect external network interface.${NC}"
+    echo -e "${YELLOW}Please specify your external interface manually by editing this script.${NC}"
     exit 1
 fi
 
-echo "Detected network configuration:"
-echo "- External interface: $EXTERNAL_IF"
-echo "- Local subnet: $LOCAL_SUBNET"
-echo "- VPN interface: $VPN_INTERFACE"
+echo -e "${BLUE}Detected network configuration:${NC}"
+echo -e "- External interface: ${GREEN}$EXTERNAL_IF${NC}"
+echo -e "- Local subnet: ${GREEN}$LOCAL_SUBNET${NC}"
+echo -e "- VPN interface: ${GREEN}$VPN_INTERFACE${NC}"
 
 # Function to enable the killswitch
 enable_killswitch() {
-    echo "Enabling VPN killswitch..."
+    echo -e "${BLUE}Enabling VPN killswitch...${NC}"
     
     # Save iptables state for recovery
     iptables-save > /tmp/iptables-before-killswitch
@@ -113,14 +121,14 @@ enable_killswitch() {
     touch $STATUS_FILE
     echo "enabled" > $STATUS_FILE
     
-    echo "✅ VPN killswitch enabled. All traffic will be blocked if VPN disconnects."
-    echo "   Your internet access works ONLY through the VPN now."
-    echo "   To disable the killswitch, run: sudo bash $0 disable"
+    echo -e "${GREEN}✅ VPN killswitch enabled. All traffic will be blocked if VPN disconnects.${NC}"
+    echo -e "${YELLOW}   Your internet access works ONLY through the VPN now.${NC}"
+    echo -e "${CYAN}   To disable the killswitch, run: sudo bash $0 disable${NC}"
 }
 
 # Function to disable the killswitch
 disable_killswitch() {
-    echo "Disabling VPN killswitch..."
+    echo -e "${BLUE}Disabling VPN killswitch...${NC}"
     
     # Flush all rules
     iptables -F
@@ -136,9 +144,9 @@ disable_killswitch() {
     if [ -f /tmp/iptables-before-killswitch ]; then
         iptables-restore < /tmp/iptables-before-killswitch
         rm /tmp/iptables-before-killswitch
-        echo "Restored previous firewall rules."
+        echo -e "${GREEN}Restored previous firewall rules.${NC}"
     else
-        echo "No previous firewall rules to restore."
+        echo -e "${YELLOW}No previous firewall rules to restore.${NC}"
     fi
     
     # Update status file
@@ -146,7 +154,7 @@ disable_killswitch() {
         echo "disabled" > $STATUS_FILE
     fi
     
-    echo "✅ VPN killswitch disabled. Traffic is now flowing normally."
+    echo -e "${GREEN}✅ VPN killswitch disabled. Traffic is now flowing normally.${NC}"
     echo "   ⚠️ WARNING: Your real IP address may be exposed if the VPN disconnects."
 }
 

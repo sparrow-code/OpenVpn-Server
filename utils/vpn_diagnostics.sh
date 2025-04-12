@@ -1,8 +1,16 @@
 #!/bin/bash
 
-echo "==============================================="
-echo "Starting VPN server diagnostics..."
-echo "==============================================="
+# Define colors for better readability
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}===============================================${NC}"
+echo -e "${BLUE}Starting VPN server diagnostics...${NC}"
+echo -e "${BLUE}===============================================${NC}"
 
 # Function to detect the primary external interface
 detect_external_interface() {
@@ -117,9 +125,9 @@ if iptables -C FORWARD -i $EXTERNAL_IF -o $VPN_IF -j ACCEPT &>/dev/null; then
 fi
 
 if $FORWARD_RULE1_OK && $FORWARD_RULE2_OK; then
-    echo "✅ Firewall forwarding rules are properly configured."
+    echo -e "${GREEN}✅ Firewall forwarding rules are properly configured.${NC}"
 else
-    echo "❌ Some firewall forwarding rules are missing:"
+    echo -e "${RED}❌ Some firewall forwarding rules are missing:${NC}"
     
     if ! $FORWARD_RULE1_OK; then
         echo "   Missing rule: sudo iptables -A FORWARD -i $VPN_IF -o $EXTERNAL_IF -j ACCEPT"
@@ -220,26 +228,26 @@ if [ -f /etc/openvpn/server.conf ]; then
     fi
     
     if [ ${#CONFIG_ISSUES[@]} -eq 0 ]; then
-        echo "✅ Server configuration appears to be valid"
+        echo -e "${GREEN}✅ Server configuration appears to be valid${NC}"
     else
-        echo "⚠️ Some potential issues with server configuration:"
+        echo -e "${YELLOW}⚠️ Some potential issues with server configuration:${NC}"
         for issue in "${CONFIG_ISSUES[@]}"; do
-            echo "   - $issue"
+            echo -e "   ${YELLOW}- $issue${NC}"
         done
         ISSUES_FOUND=true
     fi
 else
-    echo "❌ OpenVPN server configuration file not found"
-    echo "   Expected location: /etc/openvpn/server.conf"
+    echo -e "${RED}❌ OpenVPN server configuration file not found${NC}"
+    echo -e "   ${RED}Expected location: /etc/openvpn/server.conf${NC}"
     ISSUES_FOUND=true
 fi
 
 # Check for recent errors in logs
-echo "Checking OpenVPN logs for errors..."
+echo -e "${BLUE}Checking OpenVPN logs for errors...${NC}"
 if [ -f /var/log/syslog ]; then
     RECENT_ERRORS=$(grep -i "openvpn.*error" /var/log/syslog | tail -n 5)
     if [ -n "$RECENT_ERRORS" ]; then
-        echo "⚠️ Recent errors found in OpenVPN logs:"
+        echo -e "${YELLOW}⚠️ Recent errors found in OpenVPN logs:${NC}"
         echo "$RECENT_ERRORS" | while read -r line; do
             echo "   $line"
         done

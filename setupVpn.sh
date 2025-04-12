@@ -1,7 +1,14 @@
 #!/bin/bash
 
-echo "=== OpenVPN Server Setup Script ==="
-echo "This script will help you set up an OpenVPN server on your cloud machine."
+# Define colors for better readability
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}=== OpenVPN Server Setup Script ===${NC}"
+echo -e "${GREEN}This script will help you set up an OpenVPN server on your cloud machine.${NC}"
 
 # Source function files
 source "$(dirname "$0")/functions/utils.sh"
@@ -14,6 +21,19 @@ source "$(dirname "$0")/functions/prepare_client.sh"
 source "$(dirname "$0")/functions/create_additional_clients.sh"
 source "$(dirname "$0")/functions/detect_setup_state.sh"
 source "$(dirname "$0")/functions/certificate_management.sh"
+
+# Function to display messages with color
+log() {
+    echo -e "${GREEN}[INFO] $1${NC}"
+}
+
+warn() {
+    echo -e "${YELLOW}[WARNING] $1${NC}"
+}
+
+error() {
+    echo -e "${RED}[ERROR] $1${NC}"
+}
 
 # Check for existing OpenVPN installation
 check_existing_installation
@@ -148,17 +168,39 @@ else
     create_additional_clients
 
     # Display completion message
-    echo "================================================"
-    echo "OpenVPN server setup complete!"
-    echo "Certificate files for RouterOS are in: ~/client-configs/$CLIENT_NAME/"
-    echo "You need to transfer these files to your RouterOS device:"
-    echo "- ca.crt"
-    echo "- $CLIENT_NAME.crt"
-    echo "- $CLIENT_NAME.key"
-    echo "================================================"
+    echo -e "${BLUE}================================================${NC}"
+    echo -e "${GREEN}OpenVPN server setup complete!${NC}"
+    echo -e "${YELLOW}Certificate files for RouterOS are in: ${NC}${CYAN}~/client-configs/$CLIENT_NAME/${NC}"
+    echo -e "${YELLOW}You need to transfer these files to your RouterOS device:${NC}"
+    
+    # Check if certificate files exist and display with verification
+    CERT_DIR="$HOME/client-configs/$CLIENT_NAME"
+    if [ -f "$CERT_DIR/ca.crt" ]; then
+        echo -e "${GREEN}✅ - ca.crt${NC} (${CYAN}$CERT_DIR/ca.crt${NC})"
+    else
+        echo -e "${RED}❌ - ca.crt not found${NC}"
+    fi
+    
+    if [ -f "$CERT_DIR/$CLIENT_NAME.crt" ]; then
+        echo -e "${GREEN}✅ - $CLIENT_NAME.crt${NC} (${CYAN}$CERT_DIR/$CLIENT_NAME.crt${NC})"
+    else
+        echo -e "${RED}❌ - $CLIENT_NAME.crt not found${NC}"
+    fi
+    
+    if [ -f "$CERT_DIR/$CLIENT_NAME.key" ]; then
+        echo -e "${GREEN}✅ - $CLIENT_NAME.key${NC} (${CYAN}$CERT_DIR/$CLIENT_NAME.key${NC})"
+    else
+        echo -e "${RED}❌ - $CLIENT_NAME.key not found${NC}"
+    fi
+    
+    # Add commands for transferring files
+    echo -e "\n${YELLOW}To transfer files to RouterOS using SCP:${NC}"
+    echo -e "${CYAN}scp $CERT_DIR/ca.crt $CERT_DIR/$CLIENT_NAME.crt $CERT_DIR/$CLIENT_NAME.key admin@router-ip-address:/${NC}"
+    
+    echo -e "${BLUE}================================================${NC}"
     echo
-    echo "To connect additional clients, use the certificates in the respective"
-    echo "client directories: ~/client-configs/[CLIENT_NAME]/"
+    echo -e "${YELLOW}To connect additional clients, use the certificates in the respective${NC}"
+    echo -e "${YELLOW}client directories: ${NC}${CYAN}~/client-configs/[CLIENT_NAME]/${NC}"
     echo
     echo "For RouterOS devices, follow the instructions in the routerOs.sh file."
     echo "================================================"

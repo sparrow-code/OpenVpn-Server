@@ -4,13 +4,13 @@ A comprehensive bash script collection for easy deployment and management of Ope
 
 ## Features
 
-- **Automated Server Setup**: Complete OpenVPN server deployment with a single script
-- **Certificate Management**: Easy generation and management of client certificates
-- **RouterOS Integration**: Optimized for MikroTik RouterOS clients
-- **Smart Detection**: Automatically detects existing installations and setup state
-- **Flexible Configuration**: Customizable subnet, port, and client settings
-- **Guided Process**: Interactive prompts guide you through the setup process
-- **OVPN File Generation**: Generate ready-to-use .ovpn configuration files for standard OpenVPN clients
+- **Automated Server Setup**: Complete OpenVPN server deployment with a single script.
+- **Certificate Management**: Easy generation and management of client certificates.
+- **RouterOS Integration**: Optimized for MikroTik RouterOS clients.
+- **Smart Detection**: Automatically detects existing installations and setup state.
+- **Flexible Configuration**: Customizable subnet, port, and client settings.
+- **Guided Process**: Interactive prompts guide you through the setup process.
+- **OVPN File Generation**: Generate ready-to-use .ovpn configuration files for standard OpenVPN clients.
 
 ## Prerequisites
 
@@ -29,9 +29,18 @@ A comprehensive bash script collection for easy deployment and management of Ope
    ```
 
 2. Make the scripts executable:
+
    ```bash
-   chmod +x setupVpn.sh get_vpn.sh
+   chmod +x *.sh
    ```
+
+3. Run the main setup script:
+
+   ```bash
+   sudo ./setupVpn.sh
+   ```
+
+   Follow the interactive prompts to complete the setup.
 
 ## Usage
 
@@ -45,23 +54,21 @@ Run the main setup script:
 
 The script will:
 
-1. Install necessary packages
-2. Set up Easy-RSA for certificate management
-3. Generate server and initial client certificates
-4. Configure the OpenVPN server
-5. Set up proper network routing
-6. Prepare client certificates for RouterOS
-
-Follow the interactive prompts to complete the setup.
+1. Install necessary packages.
+2. Set up Easy-RSA for certificate management.
+3. Generate server and initial client certificates.
+4. Configure the OpenVPN server.
+5. Set up proper network routing.
+6. Prepare client certificates for RouterOS.
 
 ### Client Management
 
 After initial setup, running the script again will enter client management mode where you can:
 
-1. Create new client certificates
-2. Regenerate existing client certificates
-3. List all client certificates
-4. Exit the management interface
+1. Create new client certificates.
+2. Regenerate existing client certificates.
+3. List all client certificates.
+4. Exit the management interface.
 
 ### Generating OVPN Configuration Files
 
@@ -73,10 +80,10 @@ sudo ./get_vpn.sh
 
 The script will:
 
-1. List all available client certificates
-2. Let you select which client to create a configuration for
-3. Generate a complete .ovpn file with embedded certificates
-4. Save the file to `/home/itguy/vpn/ovpn_configs/` directory
+1. List all available client certificates.
+2. Let you select which client to create a configuration for.
+3. Generate a complete .ovpn file with embedded certificates.
+4. Save the file to `/home/itguy/vpn/ovpn_configs/` directory.
 
 ## File Structure
 
@@ -85,7 +92,7 @@ openvpn-routeros-setup/
 ├── setupVpn.sh            # Main script
 ├── get_vpn.sh             # OVPN configuration generator
 ├── routerOs.sh            # RouterOS configuration guide
-├── README.md              # This documentation
+├── README.md              # Documentation
 └── functions/             # Module functions
     ├── certificate_management.sh
     ├── configure_server.sh
@@ -103,10 +110,10 @@ openvpn-routeros-setup/
 
 During setup, you'll be prompted for:
 
-- **Server IP Address**: Your cloud server's public IP
-- **VPN Port**: Port for OpenVPN (default: 1194)
-- **VPN Subnet**: Internal VPN subnet (default: 10.8.0.0/24)
-- **Client Name**: Name for the initial RouterOS client certificate
+- **Server IP Address**: Your cloud server's public IP.
+- **VPN Port**: Port for OpenVPN (default: 1194).
+- **VPN Subnet**: Internal VPN subnet (default: 10.8.0.0/24).
+- **Client Name**: Name for the initial RouterOS client certificate.
 
 ## RouterOS Client Configuration
 
@@ -118,7 +125,7 @@ After generating certificates, you'll need to:
    - [client_name].crt
    - [client_name].key
 
-2. Import certificates in RouterOS and configure the OpenVPN client
+2. Import certificates in RouterOS and configure the OpenVPN client.
 
 Detailed instructions are provided in `routerOs.sh`.
 
@@ -126,25 +133,25 @@ Detailed instructions are provided in `routerOs.sh`.
 
 For standard OpenVPN clients (Windows, Linux, Android, iOS, etc.):
 
-1. Generate the .ovpn file using `get_vpn.sh`
-2. Transfer the .ovpn file to your client device
-3. Import the .ovpn file into your OpenVPN client application
+1. Generate the .ovpn file using `get_vpn.sh`.
+2. Transfer the .ovpn file to your client device.
+3. Import the .ovpn file into your OpenVPN client application.
 
 ## Troubleshooting
 
 ### Common Issues
 
-- **Connection Refused**: Check that the server port is open in your firewall
-- **TLS Handshake Failed**: Verify certificate paths and permissions
-- **Routing Problems**: Check IP forwarding settings
+- **Connection Refused**: Check that the server port is open in your firewall.
+- **TLS Handshake Failed**: Verify certificate paths and permissions.
+- **Routing Problems**: Check IP forwarding settings.
 
 Run the script again to verify the setup state and correct any issues.
 
 ## Security Considerations
 
-- The default configuration provides strong security with AES-256-CBC encryption
-- Keep your certificate files secure; anyone with your client certificates can connect to your VPN
-- Consider implementing additional firewall rules for production environments
+- The default configuration provides strong security with AES-256-CBC encryption.
+- Keep your certificate files secure; anyone with your client certificates can connect to your VPN.
+- Consider implementing additional firewall rules for production environments.
 
 ## Contributing
 
