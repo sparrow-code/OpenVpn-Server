@@ -19,76 +19,136 @@ A comprehensive bash script collection for easy deployment and management of Ope
 - Root or sudo privileges
 - Basic knowledge of networking concepts
 
-## Installation
+## Setting Up on a New VPS
+
+### Step 1: Initial VPS Configuration
+
+1. Log in to your VPS via SSH:
+   ```bash
+   ssh root@your_vps_ip_address
+   ```
+
+2. Update the system and install git:
+   ```bash
+   apt update && apt upgrade -y
+   apt install git -y
+   ```
+
+3. Secure your server (recommended):
+   ```bash
+   # Create a new user with sudo privileges
+   adduser yourusername
+   usermod -aG sudo yourusername
+   
+   # Configure SSH (optional but recommended)
+   nano /etc/ssh/sshd_config
+   # Set: PermitRootLogin no
+   # Set: PasswordAuthentication no (if using SSH keys)
+   systemctl restart sshd
+   ```
+
+### Step 2: OpenVPN Installation
 
 1. Clone this repository:
-
    ```bash
    git clone https://github.com/sparrow-code/OpenVpn-Server.git
    cd OpenVpn-Server
    ```
 
 2. Make the scripts executable:
-
    ```bash
    chmod +x *.sh
+   chmod +x utils/*.sh
+   chmod +x functions/*.sh
    ```
 
 3. Run the main setup script:
-
    ```bash
    sudo ./setupVpn.sh
    ```
 
-   Follow the interactive prompts to complete the setup.
+4. Follow the interactive prompts to complete the setup:
+   - Select a port for OpenVPN (default: 1194)
+   - Choose between UDP (faster, default) or TCP (more reliable)
+   - Enter the first client name
+   - Verify your external IP address
+   - Confirm your selections
 
-## Usage
+## Post-Installation Configuration
 
-### Initial Setup
+### Step 3: Firewall Configuration
 
-Run the main setup script:
+The setup script configures basic firewall rules, but you may want to further secure your server:
 
+1. Check if UFW (Uncomplicated Firewall) is active:
+   ```bash
+   sudo ufw status
+   ```
+
+2. If not active, set up basic rules:
+   ```bash
+   # Allow SSH
+   sudo ufw allow 22/tcp
+   
+   # Allow your OpenVPN port (example: 1194)
+   sudo ufw allow 1194/udp  # or TCP if you selected that
+   
+   # Enable the firewall
+   sudo ufw enable
+   ```
+
+### Step 4: Verify OpenVPN Service
+
+1. Check if the service is running:
+   ```bash
+   sudo systemctl status openvpn@server
+   ```
+
+2. If not running, start it:
+   ```bash
+   sudo systemctl start openvpn@server
+   sudo systemctl enable openvpn@server
+   ```
+
+### Step 5: Managing Clients
+
+#### Creating New Clients
+
+Use the VPN manager for a user-friendly interface:
 ```bash
-./setupVpn.sh
+sudo ./vpn_manager.sh
+```
+Select "Create New Client" from the menu.
+
+Alternatively, you can use the setup script in management mode:
+```bash
+sudo ./setupVpn.sh
 ```
 
-The script will:
+#### Generating OVPN Configuration Files
 
-1. Install necessary packages
-2. Set up Easy-RSA for certificate management
-3. Generate server and initial client certificates
-4. Configure the OpenVPN server
-5. Set up proper network routing
-6. Prepare client certificates
-
-### Client Management
-
-After initial setup, running the script again will enter client management mode where you can:
-
-1. Create new client certificates
-2. Regenerate existing client certificates
-3. List all client certificates
-4. Exit the management interface
-
-### Generating OVPN Configuration Files
-
-For clients, you can generate ready-to-use .ovpn configuration files:
-
+After creating client certificates, generate .ovpn files:
 ```bash
 sudo ./get_vpn.sh
 ```
 
-The script will:
-
+This will:
 1. List all available client certificates
 2. Let you select which client to create a configuration for
 3. Generate a complete .ovpn file with embedded certificates
-4. Save the file to an accessible directory
+4. Save the file to an accessible directory (typically ~/ovpns/)
 
-### Server Management
+#### Transferring OVPN Files to Clients
 
-The `vpn_manager.sh` script provides a comprehensive interface for managing your OpenVPN server:
+Transfer the .ovpn file securely to your client device:
+```bash
+# From your local machine (not the VPS)
+scp username@your_vps_ip:~/ovpns/clientname.ovpn .
+```
 
+### Step 6: Advanced Management
+
+The `vpn_manager.sh` script provides a comprehensive interface:
 ```bash
 sudo ./vpn_manager.sh
 ```
@@ -99,6 +159,30 @@ Features include:
 - Protocol switching (TCP/UDP)
 - Diagnostics and troubleshooting
 - Firewall configuration
+
+### Step 7: Troubleshooting Connection Issues
+
+If you encounter connection problems:
+
+1. Run the diagnostics tool:
+   ```bash
+   sudo ./utils/vpn_diagnostics.sh
+   ```
+
+2. Check specific client connectivity:
+   ```bash
+   sudo ./utils/vpn_troubleshoot.sh client_ip_address
+   ```
+
+3. View OpenVPN logs:
+   ```bash
+   sudo tail -f /var/log/openvpn/openvpn.log
+   ```
+
+4. Verify your firewall isn't blocking connections:
+   ```bash
+   sudo iptables -L -n
+   ```
 
 ## File Structure
 
