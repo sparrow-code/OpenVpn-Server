@@ -74,115 +74,41 @@ A comprehensive bash script collection for easy deployment and management of Ope
    - Verify your external IP address
    - Confirm your selections
 
-## Post-Installation Configuration
+## Post-Installation Management
 
-### Step 3: Firewall Configuration
+### All-in-One Management Interface
 
-The setup script configures basic firewall rules, but you may want to further secure your server:
+After installing OpenVPN, simply use the comprehensive management interface:
 
-1. Check if UFW (Uncomplicated Firewall) is active:
-   ```bash
-   sudo ufw status
-   ```
-
-2. If not active, set up basic rules:
-   ```bash
-   # Allow SSH
-   sudo ufw allow 22/tcp
-   
-   # Allow your OpenVPN port (example: 1194)
-   sudo ufw allow 1194/udp  # or TCP if you selected that
-   
-   # Enable the firewall
-   sudo ufw enable
-   ```
-
-### Step 4: Verify OpenVPN Service
-
-1. Check if the service is running:
-   ```bash
-   sudo systemctl status openvpn@server
-   ```
-
-2. If not running, start it:
-   ```bash
-   sudo systemctl start openvpn@server
-   sudo systemctl enable openvpn@server
-   ```
-
-### Step 5: Managing Clients
-
-#### Creating New Clients
-
-Use the VPN manager for a user-friendly interface:
 ```bash
 sudo ./vpn_manager.sh
 ```
-Select "Create New Client" from the menu.
 
-Alternatively, you can use the setup script in management mode:
-```bash
-sudo ./setupVpn.sh
-```
+This central interface provides access to all OpenVPN management functions:
 
-#### Generating OVPN Configuration Files
+- **Server Status**: Monitor service status and connected clients
+- **Client Management**: Create, revoke, and manage client certificates
+- **Server Configuration**: Change ports, protocols, and settings
+- **Diagnostics & Troubleshooting**: Identify and fix connection issues
+- **Protocol Switching**: Easily switch between TCP and UDP
+- **Configuration Generation**: Create .ovpn files for clients
 
-After creating client certificates, generate .ovpn files:
-```bash
-sudo ./get_vpn.sh
-```
+### Transferring Configuration Files
 
-This will:
-1. List all available client certificates
-2. Let you select which client to create a configuration for
-3. Generate a complete .ovpn file with embedded certificates
-4. Save the file to an accessible directory (typically ~/ovpns/)
-
-#### Transferring OVPN Files to Clients
-
-Transfer the .ovpn file securely to your client device:
+After generating client configurations, transfer the .ovpn file securely to your client device:
 ```bash
 # From your local machine (not the VPS)
 scp username@your_vps_ip:~/ovpns/clientname.ovpn .
 ```
 
-### Step 6: Advanced Management
+### Quick Solutions for Common Tasks
 
-The `vpn_manager.sh` script provides a comprehensive interface:
-```bash
-sudo ./vpn_manager.sh
-```
-
-Features include:
-- Server status monitoring
-- Client certificate management
-- Protocol switching (TCP/UDP)
-- Diagnostics and troubleshooting
-- Firewall configuration
-
-### Step 7: Troubleshooting Connection Issues
-
-If you encounter connection problems:
-
-1. Run the diagnostics tool:
-   ```bash
-   sudo ./utils/vpn_diagnostics.sh
-   ```
-
-2. Check specific client connectivity:
-   ```bash
-   sudo ./utils/vpn_troubleshoot.sh client_ip_address
-   ```
-
-3. View OpenVPN logs:
-   ```bash
-   sudo tail -f /var/log/openvpn/openvpn.log
-   ```
-
-4. Verify your firewall isn't blocking connections:
-   ```bash
-   sudo iptables -L -n
-   ```
+| Task | Solution |
+|------|----------|
+| **View server status** | Run `vpn_manager.sh` → Select "View OpenVPN Status" |
+| **Create a new client** | Run `vpn_manager.sh` → Select "Create New Client" |
+| **Switch protocol** | Run `vpn_manager.sh` → Select "Diagnostics & Troubleshooting" → "Switch between TCP/UDP Protocol" |
+| **Troubleshoot issues** | Run `vpn_manager.sh` → Select "Diagnostics & Troubleshooting" |
 
 ## File Structure
 
@@ -229,14 +155,14 @@ During setup, you'll be prompted for:
 
 ### Protocol Switching
 
-You can easily switch between UDP and TCP protocols:
+You can easily switch between UDP and TCP protocols using the consolidated protocol switching script:
 
 ```bash
 # Switch to TCP
-sudo ./utils/switch_to_tcp.sh
+sudo ./utils/switch_btw_protocol.sh tcp
 
 # Switch to UDP
-sudo ./utils/switch_to_udp.sh
+sudo ./utils/switch_btw_protocol.sh udp
 ```
 
 ### Diagnostics
