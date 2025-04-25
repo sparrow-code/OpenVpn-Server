@@ -160,8 +160,8 @@ EOF
     cat "${CLIENTS_DIR}/${CLIENT_NAME}/ca.crt" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     echo "</ca>" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     echo "<cert>" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
-    # Use cat instead of sed for the client cert to ensure the whole content is included
-    cat "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.crt" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
+    # Extract only the PEM-encoded certificate part, excluding any text description
+    sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.crt" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     echo "</cert>" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     echo "<key>" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     cat "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.key" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
