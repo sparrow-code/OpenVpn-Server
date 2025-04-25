@@ -116,24 +116,18 @@ if command -v ip &>/dev/null; then
     fi
 fi
 
-# 1.4. Clean up NAT rules if iptables is available
-if command -v iptables &>/dev/null; then
-    log "Cleaning up API NAT rules..."
+# 1.4. Clean up NAT rules if if command -v     log "Cleaning up API NAT rules..."
     # Find and remove the apiRouting NAT rules
     for target in "${API_TARGETS[@]}"; do
         if command -v host &>/dev/null; then
             target_ip=$(host -t A "$target" 2>/dev/null | grep "has address" | head -n1 | awk '{print $NF}' || echo "")
             if [ -n "$target_ip" ]; then
                 log "Removing NAT rules for $target_ip..."
-                iptables -t nat -S PREROUTING 2>/dev/null | grep -E -- "-d $target_ip" | while read -r rule; do
-                    modified_rule=$(echo "$rule" | sed 's/^-A/-D/')
-                    iptables -t nat $modified_rule 2>/dev/null || true
-                done
+                                    modified_rule=$(echo "$rule" | sed 's/^-A/-D/')
+                                    done
                 
-                iptables -t nat -S POSTROUTING 2>/dev/null | grep -E -- "-d $target_ip" | while read -r rule; do
-                    modified_rule=$(echo "$rule" | sed 's/^-A/-D/')
-                    iptables -t nat $modified_rule 2>/dev/null || true
-                done
+                                    modified_rule=$(echo "$rule" | sed 's/^-A/-D/')
+                                    done
             fi
         fi
     done
@@ -141,12 +135,10 @@ if command -v iptables &>/dev/null; then
     # Clean up rules mentioning common VPN IPs
     for vpn_ip in "10.8.0.1" "10.8.0.6"; do
         log "Removing NAT rules for VPN IP $vpn_ip..."
-        iptables -t nat -S 2>/dev/null | grep -E -- "$vpn_ip" | while read -r rule; do
-            chain=$(echo "$rule" | awk '{print $2}')
+                    chain=$(echo "$rule" | awk '{print $2}')
             if [[ "$chain" == "PREROUTING" || "$chain" == "POSTROUTING" ]]; then
                 modified_rule=$(echo "$rule" | sed 's/^-A/-D/')
-                iptables -t nat $modified_rule 2>/dev/null || true
-            fi
+                            fi
         done
     done
 fi
@@ -264,21 +256,14 @@ for tun in /dev/net/tun*; do
     fi
 done
 
-# 6.2 Clean up iptables rules related to OpenVPN
-if command -v iptables &>/dev/null; then
-    log "Cleaning up iptables rules..."
-    
+# 6.2 Clean up if command -v     log "Cleaning up     
     # Clean up NAT masquerade rules for common OpenVPN subnet
-    iptables -t nat -S POSTROUTING 2>/dev/null | grep -E "10.8.0.0/24" | while read -r rule; do
-        modified_rule=$(echo "$rule" | sed 's/^-A/-D/')
-        iptables -t nat $modified_rule 2>/dev/null || true
-    done
+            modified_rule=$(echo "$rule" | sed 's/^-A/-D/')
+            done
     
     # Clean up forward rules for OpenVPN
-    iptables -S FORWARD 2>/dev/null | grep -E "tun|openvpn|10.8.0.0/24" | while read -r rule; do
-        modified_rule=$(echo "$rule" | sed 's/^-A/-D/')
-        iptables $modified_rule 2>/dev/null || true
-    done
+            modified_rule=$(echo "$rule" | sed 's/^-A/-D/')
+            done
 fi
 
 # 6.3 Remove IP forwarding configuration if it was set for OpenVPN

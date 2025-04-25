@@ -111,50 +111,10 @@ if command -v ufw &> /dev/null && ufw status | grep -q "Status: active"; then
     fi
 
 else
-    # Fall back to checking iptables rules if UFW is not active
-    warning "UFW is not active. Checking traditional iptables rules instead."
-    
-    # Check NAT rule
-    if iptables -t nat -C POSTROUTING -o $EXTERNAL_IF -j MASQUERADE &>/dev/null; then
-        success "NAT rule for VPN traffic is properly configured."
-    else
-        failure "NAT rule for VPN traffic is missing."
-        echo "   Add it using: sudo iptables -t nat -A POSTROUTING -o $EXTERNAL_IF -j MASQUERADE"
-        echo "   Alternatively, consider using UFW with the migrate_to_ufw.sh script."
-        NAT_MISSING=true
-        ISSUES_FOUND=true
-    fi
-
-    # Check forwarding rules
-    FORWARD_RULE1_OK=false
-    FORWARD_RULE2_OK=false
-
-    if iptables -C FORWARD -i $VPN_IF -o $EXTERNAL_IF -j ACCEPT &>/dev/null; then
-        FORWARD_RULE1_OK=true
-    fi
-
-    if iptables -C FORWARD -i $EXTERNAL_IF -o $VPN_IF -j ACCEPT &>/dev/null; then
-        FORWARD_RULE2_OK=true
-    fi
-
-    if $FORWARD_RULE1_OK && $FORWARD_RULE2_OK; then
-        success "Firewall forwarding rules are properly configured."
-    else
-        failure "Some firewall forwarding rules are missing:"
-        
-        if ! $FORWARD_RULE1_OK; then
-            echo "   Missing rule: sudo iptables -A FORWARD -i $VPN_IF -o $EXTERNAL_IF -j ACCEPT"
-        fi
-        
-        if ! $FORWARD_RULE2_OK; then
-            echo "   Missing rule: sudo iptables -A FORWARD -i $EXTERNAL_IF -o $VPN_IF -j ACCEPT"
-        fi
-        
-        echo "   These rules are needed to allow traffic forwarding between VPN clients and the internet."
-        echo "   Consider using the migrate_to_ufw.sh script for easier firewall management."
-        FIREWALL_MISSING=true
-        ISSUES_FOUND=true
-    fi
+    failure "UFW is not active. Please enable UFW for proper firewall management with OpenVPN."
+    echo "   To enable UFW, run: sudo ufw --force enable"
+    echo "   Then configure UFW for OpenVPN using: sudo bash $(dirname \"$0\")/migrate_to_ufw.sh"
+    ISSUES_FOUND=true
 fi
 
 # 4. Check DNS resolution
@@ -286,24 +246,10 @@ if $ISSUES_FOUND || [[ -n "$NAT_MISSING" ]] || [[ -n "$FIREWALL_MISSING" ]]; the
         echo "sysctl -p" >> $FIX_SCRIPT
     fi
     
-    if [[ -n "$NAT_MISSING" ]]; then
-        echo "echo 'Adding NAT rule...'" >> $FIX_SCRIPT
-        echo "iptables -t nat -A POSTROUTING -o $EXTERNAL_IF -j MASQUERADE" >> $FIX_SCRIPT
-    fi
-    
-    if ! $FORWARD_RULE1_OK; then
-        echo "echo 'Adding forwarding rule from VPN to internet...'" >> $FIX_SCRIPT
-        echo "iptables -A FORWARD -i $VPN_IF -o $EXTERNAL_IF -j ACCEPT" >> $FIX_SCRIPT
-    fi
-    
-    if ! $FORWARD_RULE2_OK; then
-        echo "echo 'Adding forwarding rule from internet to VPN...'" >> $FIX_SCRIPT
-        echo "iptables -A FORWARD -i $EXTERNAL_IF -o $VPN_IF -j ACCEPT" >> $FIX_SCRIPT
-    fi
-    
-    echo "echo 'To make these iptables rules permanent, run:'" >> $FIX_SCRIPT
-    echo "echo 'sudo apt install iptables-persistent && sudo netfilter-persistent save'" >> $FIX_SCRIPT
-    echo "echo 'All issues have been fixed!'" >> $FIX_SCRIPT
+    echo "echo 'Please ensure UFW is enabled and configured for OpenVPN.'" >> $FIX_SCRIPT
+    echo "echo 'Run: sudo ufw --force enable'" >> $FIX_SCRIPT
+    echo "echo 'Then run: sudo bash $(dirname "$0")/migrate_to_ufw.sh'" >> $FIX_SCRIPT
+    echo "echo 'All issues have been addressed with UFW configuration!'" >> $FIX_SCRIPT
     
     echo
     echo "📝 An automatic fix script has been created at $FIX_SCRIPT"
@@ -312,26 +258,11 @@ fi
 
 # Summary and recommendations
 echo "----------------------------------------------"
-if [[ -n "$NAT_MISSING" || -n "$FIREWALL_MISSING" ]]; then
+if $ISSUES_FOUND || [[ -n "$UFW_PORT_MISSING" ]] || [[ -n "$UFW_FORWARDING_DISABLED" ]] || [[ -n "$UFW_NAT_MISSING" ]] || [[ -n "$UFW_ROUTE_MISSING" ]]; then
     echo "⚠️ VPN configuration has issues that need to be fixed."
-    echo "Please run the following commands to fix the firewall configuration:"
-    
-    if [[ -n "$NAT_MISSING" ]]; then
-        echo "sudo iptables -t nat -A POSTROUTING -o $EXTERNAL_IF -j MASQUERADE"
-    fi
-    
-    if ! $FORWARD_RULE1_OK; then
-        echo "sudo iptables -A FORWARD -i $VPN_IF -o $EXTERNAL_IF -j ACCEPT"
-    fi
-    
-    if ! $FORWARD_RULE2_OK; then
-        echo "sudo iptables -A FORWARD -i $EXTERNAL_IF -o $VPN_IF -j ACCEPT"
-    fi
-    
-    echo
-    echo "To make these changes permanent, install iptables-persistent:"
-    echo "sudo apt install iptables-persistent"
-    echo "After adding the rules, save them with: sudo netfilter-persistent save"
+    echo "Please ensure UFW is enabled and configured for OpenVPN:"
+    echo "Run: sudo ufw --force enable"
+    echo "Then run: sudo bash $(dirname "$0")/migrate_to_ufw.sh"
 else
     echo "✅ All checks passed. VPN server is configured properly!"
 fi

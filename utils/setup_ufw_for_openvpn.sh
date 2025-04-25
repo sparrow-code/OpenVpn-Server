@@ -148,7 +148,7 @@ echo -e "\nCurrent UFW routes:"
 ufw status | grep ROUTE || echo "No UFW routes found"
 
 echo -e "\nSetup complete."
-echo "Your OpenVPN server is now configured to use UFW instead of iptables."
+echo "Your OpenVPN server is now configured to use UFW instead of ."
 echo "Test your VPN connection to verify everything is working properly."
 
 exit 0

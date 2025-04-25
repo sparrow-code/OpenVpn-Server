@@ -177,14 +177,10 @@ if command -v ufw &> /dev/null && ufw status | grep -q "Status: active"; then
         echo "ufw reload" >> $FIX_SCRIPT
     fi
 else
-    # Check traditional iptables
-    if iptables -C INPUT -i $VPN_IF -j ACCEPT &>/dev/null; then
-        success "Firewall allows incoming traffic from VPN interface"
-    else
-        failure "Firewall might be blocking incoming VPN traffic"
-        echo "   Run: sudo iptables -A INPUT -i $VPN_IF -j ACCEPT"
-        echo "iptables -A INPUT -i $VPN_IF -j ACCEPT" >> $FIX_SCRIPT
-    fi
+    # UFW not active, suggest enabling it
+    failure "UFW is not active. Please enable UFW for proper firewall management with OpenVPN."
+    echo "   To enable UFW, run: sudo ufw --force enable"
+    echo "   Then configure UFW for OpenVPN using: sudo bash $(dirname "$0")/migrate_to_ufw.sh"
 fi
 
 # Fix suggestions
@@ -197,12 +193,10 @@ echo "-----------------------------------------------"
 FIX_SCRIPT="/tmp/vpn_client_connectivity_fix.sh"
 create_fix_script "$FIX_SCRIPT" "fix VPN client connectivity issues"
 
-# 1. Add iptables rules if needed
-if ! iptables -C INPUT -i $VPN_IF -j ACCEPT &>/dev/null; then
-    echo "echo 'Adding firewall rule to allow incoming VPN traffic...'" >> $FIX_SCRIPT
-    echo "iptables -A INPUT -i $VPN_IF -j ACCEPT" >> $FIX_SCRIPT
-    echo "Added: iptables rule to allow traffic from VPN"
-fi
+# 1. Suggest UFW configuration if needed
+echo "echo 'Please ensure UFW is enabled and configured for OpenVPN.'" >> $FIX_SCRIPT
+echo "echo 'Run: sudo ufw --force enable'" >> $FIX_SCRIPT
+echo "echo 'Then configure UFW for OpenVPN using: sudo bash $(dirname "$0")/migrate_to_ufw.sh'" >> $FIX_SCRIPT
 
 # 2. Add route if needed
 if ! ip route | grep -q "$CLIENT_IP"; then
@@ -224,7 +218,7 @@ echo ""
 echo "Instructions for client-side:"
 echo "1. Check if the client firewall allows incoming ICMP packets (ping)"
 echo "2. For Windows clients, try: netsh advfirewall firewall add rule name=\"Allow ICMP\" protocol=icmpv4:8,any dir=in action=allow"
-echo "3. For Linux clients, try: sudo iptables -A INPUT -p icmp -j ACCEPT"
+echo "3. For Linux clients, ensure firewall allows ICMP if needed."
 echo ""
 echo "To apply server-side fixes automatically, run:"
 echo "sudo bash $FIX_SCRIPT"

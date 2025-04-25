@@ -229,13 +229,11 @@ update_firewall_for_protocol() {
             success "FirewallD rule added for port $port/$protocol"
         fi
     else
-        log "Checking iptables rules..."
-        if ! iptables -L INPUT -n | grep -q "$protocol dpt:$port"; then
-            iptables -A INPUT -p $protocol --dport $port -j ACCEPT
-            success "iptables rule added for port $port/$protocol"
-            warn "Note: This iptables rule will not persist after reboot without saving"
-            info "Consider installing iptables-persistent or similar package."
-        fi
+        warn "No active firewall manager detected (UFW or FirewallD)."
+        info "Consider installing and enabling UFW for easier firewall management."
+        echo -e "  Install with: ${CYAN}sudo apt update && sudo apt install -y ufw${NC}"
+        echo -e "  Enable with: ${CYAN}sudo ufw --force enable${NC}"
+        echo -e "  Add rule with: ${CYAN}sudo ufw allow $port/$protocol${NC}"
     fi
 }
 

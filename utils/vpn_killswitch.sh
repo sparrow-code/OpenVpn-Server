@@ -58,30 +58,40 @@ echo -e "- VPN interface: ${GREEN}$VPN_INTERFACE${NC}"
 enable_killswitch() {
     echo -e "${BLUE}Enabling VPN killswitch...${NC}"
     
-    # Save iptables state for recovery
-    iptables-save > /tmp/iptables-before-killswitch
+    # Check if UFW is installed and active
+    if ! command -v ufw &> /dev/null; then
+        echo -e "${RED}UFW is not installed. Installing UFW...${NC}"
+        apt update
+        apt install -y ufw
+    fi
     
-    # Flush existing rules
-    iptables -F
-    iptables -X
-    iptables -t nat -F
+    if ! ufw status | grep -q "Status: active"; then
+        echo -e "${RED}UFW is not active. Enabling UFW...${NC}"
+        ufw --force enable
+    fi
+    
+    # Backup current UFW rules if possible
+    echo -e "${YELLOW}Backing up current UFW rules...${NC}"
+    ufw status verbose > /tmp/ufw-before-killswitch-$(date +"%Y%m%d-%H%M%S").backup
+    
+    # Reset UFW to default state for killswitch setup
+    ufw reset --force
     
     # Set default policies - block all by default
-    iptables -P INPUT DROP
-    iptables -P FORWARD DROP
-    iptables -P OUTPUT DROP
+    ufw default deny incoming
+    ufw default deny outgoing
     
     # Allow loopback
-    iptables -A INPUT -i lo -j ACCEPT
-    iptables -A OUTPUT -o lo -j ACCEPT
+    ufw allow in on lo
+    ufw allow out on lo
     
     # Allow established and related connections
-    iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-    iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+    ufw allow in proto tcp from any to any established
+    ufw allow out proto tcp from any to any established
     
     # Allow local network
-    iptables -A INPUT -s $LOCAL_SUBNET -j ACCEPT
-    iptables -A OUTPUT -d $LOCAL_SUBNET -j ACCEPT
+    ufw allow in from $LOCAL_SUBNET
+    ufw allow out to $LOCAL_SUBNET
     
     # Allow connections to/from VPN server
     # First get the VPN server IP (from /etc/openvpn/server.conf)
@@ -91,31 +101,34 @@ enable_killswitch() {
         
         if [ -n "$VPN_SERVER" ] && [ -n "$VPN_PORT" ]; then
             # Allow connection to VPN server
-            iptables -A OUTPUT -o $EXTERNAL_IF -d $VPN_SERVER -p udp --dport $VPN_PORT -j ACCEPT
-            iptables -A INPUT -i $EXTERNAL_IF -s $VPN_SERVER -p udp --sport $VPN_PORT -j ACCEPT
+            ufw allow out to $VPN_SERVER port $VPN_PORT proto udp
+            ufw allow in from $VPN_SERVER port $VPN_PORT proto udp
             echo "Added rules for VPN server $VPN_SERVER on port $VPN_PORT"
         else
             echo "WARNING: Could not detect VPN server from config, adding general UDP/1194 rule"
             # Allow OpenVPN traffic (default port)
-            iptables -A OUTPUT -o $EXTERNAL_IF -p udp --dport 1194 -j ACCEPT
-            iptables -A INPUT -i $EXTERNAL_IF -p udp --sport 1194 -j ACCEPT
+            ufw allow out to any port 1194 proto udp
+            ufw allow in from any port 1194 proto udp
         fi
     else
         echo "WARNING: No OpenVPN config found, adding general UDP/1194 rule"
         # Allow OpenVPN traffic (default port)
-        iptables -A OUTPUT -o $EXTERNAL_IF -p udp --dport 1194 -j ACCEPT
-        iptables -A INPUT -i $EXTERNAL_IF -p udp --sport 1194 -j ACCEPT
+        ufw allow out to any port 1194 proto udp
+        ufw allow in from any port 1194 proto udp
     fi
     
     # Allow DNS queries (needed to resolve VPN server address)
-    iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
-    iptables -A INPUT -p udp --sport 53 -j ACCEPT
-    iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
-    iptables -A INPUT -p tcp --sport 53 -j ACCEPT
+    ufw allow out to any port 53 proto udp
+    ufw allow in from any port 53 proto udp
+    ufw allow out to any port 53 proto tcp
+    ufw allow in from any port 53 proto tcp
     
     # Allow traffic through VPN tunnel
-    iptables -A INPUT -i $VPN_INTERFACE -j ACCEPT
-    iptables -A OUTPUT -o $VPN_INTERFACE -j ACCEPT
+    ufw allow in on $VPN_INTERFACE
+    ufw allow out on $VPN_INTERFACE
+    
+    # Reload UFW to apply changes
+    ufw reload
     
     # Create a mark for the killswitch status
     touch $STATUS_FILE
@@ -130,24 +143,21 @@ enable_killswitch() {
 disable_killswitch() {
     echo -e "${BLUE}Disabling VPN killswitch...${NC}"
     
-    # Flush all rules
-    iptables -F
-    iptables -X
-    iptables -t nat -F
-    
-    # Set default policies to ACCEPT
-    iptables -P INPUT ACCEPT
-    iptables -P FORWARD ACCEPT
-    iptables -P OUTPUT ACCEPT
-    
-    # If we have a saved iptables state, restore it
-    if [ -f /tmp/iptables-before-killswitch ]; then
-        iptables-restore < /tmp/iptables-before-killswitch
-        rm /tmp/iptables-before-killswitch
-        echo -e "${GREEN}Restored previous firewall rules.${NC}"
-    else
-        echo -e "${YELLOW}No previous firewall rules to restore.${NC}"
+    # Check if UFW is installed and active
+    if ! command -v ufw &> /dev/null; then
+        echo -e "${RED}UFW is not installed. Cannot disable killswitch.${NC}"
+        exit 1
     fi
+    
+    # Reset UFW rules to default
+    ufw reset --force
+    
+    # Set default policies to allow
+    ufw default allow incoming
+    ufw default allow outgoing
+    
+    # Reload UFW to apply changes
+    ufw reload
     
     # Update status file
     if [ -f "$STATUS_FILE" ]; then

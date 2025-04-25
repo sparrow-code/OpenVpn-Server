@@ -1,62 +1,20 @@
 #!/bin/bash
 
-# Source common utilities
-source "$(dirname "$0")/common.sh"
+# Show header
+echo "==============================================="
+echo "      Configure UFW for OpenVPN (No iptables)"
+echo "==============================================="
 
-# Display header
-show_header "Migrate OpenVPN from iptables to UFW"
-
-# Check if running as root
-check_root
-
-# Check if UFW is installed
-if ! command -v ufw &> /dev/null; then
-    echo "Installing UFW (Uncomplicated Firewall)..."
-    apt update
-    apt install -y ufw
-fi
-
-# Get OpenVPN configuration
-echo "Detecting OpenVPN configuration..."
-if [ -f "/etc/openvpn/server.conf" ]; then
-    VPN_PORT=$(grep "^port " /etc/openvpn/server.conf | awk '{print $2}' || echo "1194")
-    VPN_PROTO=$(grep "^proto " /etc/openvpn/server.conf | awk '{print $2}' || echo "udp")
-    
-    echo "Detected OpenVPN settings:"
-    echo "- Port: $VPN_PORT"
-    echo "- Protocol: $VPN_PROTO"
-else
-    echo "Warning: OpenVPN server configuration not found."
-    VPN_PORT="1194"
-    VPN_PROTO="tcp"
-    echo "Using default settings:"
-    echo "- Port: $VPN_PORT"
-    echo "- Protocol: $VPN_PROTO"
-fi
-
-# Get VPN subnet from server.conf
-if [ -f "/etc/openvpn/server.conf" ]; then
-    VPN_SUBNET=$(grep "^server " /etc/openvpn/server.conf | awk '{print $2"/"substr($3,4)}' || echo "10.8.0.0/24")
-else
-    VPN_SUBNET="10.8.0.0/24"
-fi
-
-echo "- VPN Subnet: $VPN_SUBNET"
-
-# Detect network interfaces
-EXTERNAL_IF=$(ip -4 route show default | grep -Po '(?<=dev )(\S+)' | head -1)
-VPN_IF=$(ip addr | grep -E '^[0-9]+: tun' | cut -d: -f2 | tr -d ' ' | head -1)
-
+# Detect external interface
+EXTERNAL_IF=$(ip -4 route show default | grep -Po '(?<=dev )(\S+)' | head -n1)
 if [ -z "$EXTERNAL_IF" ]; then
-    echo "Warning: Could not detect external network interface."
-    echo "Please enter your external interface name (e.g., eth0):"
-    read EXTERNAL_IF
-    if [ -z "$EXTERNAL_IF" ]; then
-        echo "No interface specified. Using eth0 as default."
-        EXTERNAL_IF="eth0"
-    fi
+    echo "Could not detect external network interface."
+    read -p "Enter your external interface (e.g., eth0): " EXTERNAL_IF
 fi
+echo "External interface: $EXTERNAL_IF"
 
+# Detect VPN interface
+VPN_IF=$(ip -o link show | grep -oP '(?<=: )(tun[0-9]+|tap[0-9]+)' | head -n1)
 if [ -z "$VPN_IF" ]; then
     VPN_IF="tun0"
     echo "VPN interface not detected. Using $VPN_IF as default."
@@ -64,93 +22,64 @@ else
     echo "Detected VPN interface: $VPN_IF"
 fi
 
-echo "Detected external interface: $EXTERNAL_IF"
+# Detect OpenVPN port/protocol
+if [ -f "/etc/openvpn/server.conf" ]; then
+    VPN_PORT=$(grep "^port " /etc/openvpn/server.conf | awk '{print $2}')
+    VPN_PROTO=$(grep "^proto " /etc/openvpn/server.conf | awk '{print $2}')
+else
+    read -p "Enter OpenVPN port [default 1194]: " VPN_PORT
+    VPN_PORT=${VPN_PORT:-1194}
+    read -p "Enter OpenVPN protocol (udp/tcp) [default udp]: " VPN_PROTO
+    VPN_PROTO=${VPN_PROTO:-udp}
+fi
 
-# Backup existing iptables rules
-echo "Backing up current iptables rules..."
-iptables-save > /tmp/iptables-backup-$(date +"%Y%m%d-%H%M%S").rules
-echo "Backup saved to /tmp/iptables-backup-*.rules"
+echo "OpenVPN port: $VPN_PORT/$VPN_PROTO"
 
-# Configure UFW for OpenVPN
-echo "Configuring UFW for OpenVPN..."
+# Detect SSH port
+SSH_PORT=$(grep "^Port " /etc/ssh/sshd_config 2>/dev/null | awk '{print $2}' | head -n1)
+if [ -z "$SSH_PORT" ]; then
+    SSH_PORT=22
+fi
+echo "Detected SSH port: $SSH_PORT"
 
-# First, ensure SSH access to prevent lockout
-echo "Ensuring SSH access is allowed..."
-ufw allow OpenSSH
+# Ensure UFW is installed and enabled
+if ! command -v ufw &>/dev/null; then
+    echo "UFW is not installed. Installing..."
+    apt update && apt install -y ufw
+fi
+
+echo "Enabling UFW..."
+ufw --force enable
+
+# Always allow SSH port
+echo "Allowing SSH port $SSH_PORT..."
+ufw allow $SSH_PORT/tcp
 
 # Allow OpenVPN port
-echo "Adding OpenVPN port rule..."
+echo "Allowing OpenVPN port $VPN_PORT/$VPN_PROTO..."
 ufw allow $VPN_PORT/$VPN_PROTO
 
-# Enable packet forwarding in UFW
-echo "Enabling packet forwarding in UFW..."
+# Set UFW forwarding policy to ACCEPT
+echo "Setting UFW forwarding policy to ACCEPT..."
 sed -i 's/DEFAULT_FORWARD_POLICY="DROP"/DEFAULT_FORWARD_POLICY="ACCEPT"/g' /etc/default/ufw
 
-# Enable IP forwarding in UFW's configuration
-if ! grep -q "net.ipv4.ip_forward=1" /etc/ufw/sysctl.conf; then
-    echo "Adding IP forwarding to UFW configuration..."
-    echo 'net.ipv4.ip_forward=1' >> /etc/ufw/sysctl.conf
-fi
-
-# Set up NAT masquerading in UFW
-echo "Setting up NAT masquerading..."
+# Add NAT masquerading to /etc/ufw/before.rules if not present
 if ! grep -q "POSTROUTING -s 10.8.0.0/24" /etc/ufw/before.rules; then
-    cat << EOF | sed -i '1r /dev/stdin' /etc/ufw/before.rules
-# NAT table rules for OpenVPN
-*nat
-:POSTROUTING ACCEPT [0:0]
-# Forward traffic from VPN through $EXTERNAL_IF
--A POSTROUTING -s 10.8.0.0/24 -o $EXTERNAL_IF -j MASQUERADE
-COMMIT
-
-EOF
-    echo "Added NAT masquerading rules to UFW configuration."
-else
-    echo "NAT masquerading already configured in UFW."
+    echo "Adding NAT masquerading to /etc/ufw/before.rules..."
+    sed -i '1i # NAT for OpenVPN\n*nat\n:POSTROUTING ACCEPT [0:0]\n-A POSTROUTING -s 10.8.0.0/24 -o '"$EXTERNAL_IF"' -j MASQUERADE\nCOMMIT\n' /etc/ufw/before.rules
 fi
 
-# Allow traffic forwarding between VPN and internet interfaces
-echo "Adding routing rules for VPN traffic..."
+# Allow VPN routing
+echo "Allowing VPN routing..."
 ufw route allow in on $VPN_IF out on $EXTERNAL_IF
-ufw route allow in on $EXTERNAL_IF out on $VPN_IF
 
-# Enable the firewall if it's not already enabled
-if ! ufw status | grep -q "Status: active"; then
-    echo "========================= WARNING ============================="
-    echo "About to enable UFW firewall. This might disconnect your SSH session"
-    echo "if you're connected remotely and SSH rules aren't properly configured."
-    echo "Make sure that SSH access is allowed (we've tried to add it above)."
-    echo "========================= WARNING ============================="
-    read -p "Continue enabling UFW? (y/n): " ENABLE_UFW
-    if [[ $ENABLE_UFW =~ ^[Yy]$ ]]; then
-        echo "Enabling UFW..."
-        ufw --force enable
-        echo "UFW enabled."
-    else
-        echo "UFW not enabled. You can manually enable it later with 'sudo ufw enable'."
-        echo "Make sure to allow SSH first with 'sudo ufw allow OpenSSH'."
-    fi
-else
-    echo "UFW is already active. Reloading configuration..."
-    ufw reload
-fi
+# Reload UFW to apply changes
+echo "Reloading UFW..."
+ufw reload
 
-# Verify UFW configuration
-echo "UFW status:"
-ufw status verbose
-
-echo "UFW routes:"
-ufw status | grep ROUTE
-
-echo "Migration from iptables to UFW completed!"
-echo "IP forwarding status:"
-sysctl net.ipv4.ip_forward
-
-echo ""
-echo "Next steps:"
-echo "1. Test your OpenVPN connection to make sure it works with UFW."
-echo "2. If everything is working properly, consider clearing old iptables rules."
-echo "3. For persistent UFW rules across reboots, ensure ufw service starts on boot:"
-echo "   sudo systemctl enable ufw"
-
-exit 0
+echo "==============================================="
+echo "UFW is now configured for OpenVPN."
+echo "SSH access is allowed on port $SSH_PORT."
+echo "OpenVPN access is allowed on port $VPN_PORT/$VPN_PROTO."
+echo "NAT and forwarding are enabled."
+echo "==============================================="

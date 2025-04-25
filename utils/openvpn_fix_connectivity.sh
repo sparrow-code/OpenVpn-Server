@@ -102,26 +102,13 @@ EOF
     ufw reload
     echo -e "${GREEN}✓ UFW rules applied and reloaded.${NC}"
 else
-    # Using iptables directly
-    echo -e "UFW not active, using iptables directly..."
-    
-    # Clear any existing conflicting rules
-    iptables -t nat -D POSTROUTING -s 10.8.0.0/24 -o $EXTERNAL_IF -j MASQUERADE 2>/dev/null || true
-    iptables -D FORWARD -i tun0 -o $EXTERNAL_IF -j ACCEPT 2>/dev/null || true
-    iptables -D FORWARD -i $EXTERNAL_IF -o tun0 -j ACCEPT 2>/dev/null || true
-    
-    # Add NAT and forwarding rules
-    iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o $EXTERNAL_IF -j MASQUERADE
-    iptables -A FORWARD -i tun0 -o $EXTERNAL_IF -j ACCEPT
-    iptables -A FORWARD -i $EXTERNAL_IF -o tun0 -j ACCEPT
-    
-    # Allow OpenVPN port
-    iptables -A INPUT -i $EXTERNAL_IF -p $VPN_PROTO --dport $VPN_PORT -j ACCEPT
-    
-    echo -e "${GREEN}✓ iptables rules applied.${NC}"
-    echo -e "${YELLOW}! Remember these rules will be lost on reboot unless you save them.${NC}"
-    echo -e "  ${CYAN}To make iptables rules persistent, install: apt install iptables-persistent${NC}"
-    echo -e "  ${CYAN}Then save rules with: netfilter-persistent save${NC}"
+    # UFW not active, prompting to enable it
+    echo -e "${RED}UFW is not active. It is required for proper OpenVPN connectivity management.${NC}"
+    echo -e "${YELLOW}To install and enable UFW, run:${NC}"
+    echo -e "  ${CYAN}sudo apt update && sudo apt install -y ufw${NC}"
+    echo -e "  ${CYAN}sudo ufw --force enable${NC}"
+    echo -e "${YELLOW}Then run the migration script to configure UFW for OpenVPN:${NC}"
+    echo -e "  ${CYAN}sudo bash $(dirname "$0")/migrate_to_ufw.sh${NC}"
 fi
 
 # Step 4: Fix permissions and check OpenVPN config

@@ -156,10 +156,16 @@ The setup configures proper network forwarding and firewall rules for the VPN:
 echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-openvpn.conf
 sysctl -p
 
-# Configure iptables for NAT
-iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
-iptables -A FORWARD -i tun0 -o eth0 -j ACCEPT
-iptables -A FORWARD -i eth0 -o tun0 -j ACCEPT
+# Configure UFW for NAT and forwarding (recommended)
+# 1. Allow OpenVPN port (replace 1194/udp with your port/protocol)
+sudo ufw allow 1194/udp
+
+# 2. Set UFW forwarding policy to ACCEPT
+sudo sed -i 's/DEFAULT_FORWARD_POLICY="DROP"/DEFAULT_FORWARD_POLICY="ACCEPT"/g' /etc/default/ufw
+
+# 3. Add NAT masquerading to /etc/ufw/before.rules (see setup_ufw_for_openvpn.sh for automation)
+# 4. Reload UFW to apply changes
+sudo ufw reload
 ```
 
 ## 7. Diagnostics and Troubleshooting

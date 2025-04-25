@@ -60,23 +60,27 @@ else
     echo -e "${YELLOW}! UFW is not installed.${NC}"
 fi
 
-# Check iptables
-echo -e "\n${YELLOW}Checking iptables rules...${NC}"
-if iptables -L -n | grep -q "$VPN_PORT"; then
-    echo -e "${GREEN}✓ iptables has rules for port $VPN_PORT.${NC}"
+# Check UFW configuration for NAT and forwarding if active
+if command -v ufw &> /dev/null && ufw status | grep -q "Status: active"; then
+    echo -e "\n${YELLOW}Checking UFW NAT and forwarding rules...${NC}"
+    if grep -q "POSTROUTING -s 10.8.0.0/24" /etc/ufw/before.rules; then
+        echo -e "${GREEN}✓ UFW NAT masquerading is configured.${NC}"
+    else
+        echo -e "${RED}✗ UFW NAT masquerading is NOT configured.${NC}"
+        echo -e "  Run the migration script to configure: ${CYAN}sudo bash $(dirname "$0")/migrate_to_ufw.sh${NC}"
+    fi
+    if grep -q "DEFAULT_FORWARD_POLICY=\"ACCEPT\"" /etc/default/ufw; then
+        echo -e "${GREEN}✓ UFW forwarding policy is set to ACCEPT.${NC}"
+    else
+        echo -e "${RED}✗ UFW forwarding policy is NOT set to ACCEPT.${NC}"
+        echo -e "  Update with: ${CYAN}sudo sed -i 's/DEFAULT_FORWARD_POLICY=\"DROP\"/DEFAULT_FORWARD_POLICY=\"ACCEPT\"/g' /etc/default/ufw && sudo ufw reload${NC}"
+    fi
 else
-    echo -e "${YELLOW}! No explicit iptables rules found for port $VPN_PORT.${NC}"
-    echo -e "  Check if port $VPN_PORT is allowed:"
-fi
-
-# Check for NAT rules
-echo -e "\n${YELLOW}Checking NAT rules...${NC}"
-if iptables -t nat -L -n | grep -q "MASQUERADE"; then
-    echo -e "${GREEN}✓ NAT masquerading is configured.${NC}"
-else
-    echo -e "${RED}✗ NAT masquerading is NOT configured.${NC}"
-    echo -e "  Add with: ${CYAN}sudo iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE${NC}"
-    echo -e "  (Replace 'eth0' with your actual external interface)"
+    echo -e "\n${YELLOW}UFW is not active or installed...${NC}"
+    echo -e "${RED}✗ Please install and enable UFW for proper firewall management.${NC}"
+    echo -e "  Install with: ${CYAN}sudo apt update && sudo apt install -y ufw${NC}"
+    echo -e "  Enable with: ${CYAN}sudo ufw --force enable${NC}"
+    echo -e "  Configure for OpenVPN with: ${CYAN}sudo bash $(dirname "$0")/migrate_to_ufw.sh${NC}"
 fi
 
 # Test port from inside the server
