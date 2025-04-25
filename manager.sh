@@ -141,20 +141,33 @@ create_client() {
     echo "Generating OVPN file for client: ${CLIENT_NAME}..."
     echo "Using: IP=${SERVER_IP}, PORT=${SERVER_PORT}, PROTOCOL=${PROTOCOL}"
     
-    cat "${BASE_CONFIG}" > "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
+    # Define the base configuration directly
+    cat > "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn" << EOF
+client
+dev tun
+# The proto and remote lines will be updated by sed below
+proto ${PROTOCOL}
+remote ${SERVER_IP} ${SERVER_PORT}
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+cipher AES-256-CBC
+verb 3
+EOF
     echo "<ca>" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     cat "${CLIENTS_DIR}/${CLIENT_NAME}/ca.crt" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     echo "</ca>" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     echo "<cert>" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
-    sed -ne '/BEGIN CERTIFICATE/,$ p' "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.crt" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
+    # Use cat instead of sed for the client cert to ensure the whole content is included
+    cat "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.crt" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     echo "</cert>" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     echo "<key>" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     cat "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.key" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     echo "</key>" >> "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     
-    # Update server details in OVPN file
-    sed -i "s/remote my-server-1 1194/remote ${SERVER_IP} ${SERVER_PORT}/g" "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
-    sed -i "s/proto tcp/proto ${PROTOCOL}/g" "${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
+    # Server details are already set with variables in the OVPN file
     
     echo "OVPN file created successfully: ${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.ovpn"
     echo "File permissions:"
